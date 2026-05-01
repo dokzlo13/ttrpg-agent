@@ -1,0 +1,73 @@
+# --- local data -------------------------------------------------------------
+
+# Working campaign vault and all user/imported/generated content.
+# Keep only directory skeleton placeholders in git; all real data remains local.
+vault/*
+!vault/.gitkeep
+!vault/notes/
+vault/notes/*
+!vault/notes/.gitkeep
+!vault/library/
+vault/library/*
+!vault/library/.gitkeep
+!vault/library/books/
+vault/library/books/*
+!vault/library/books/.gitkeep
+
+imports/*
+!imports/.gitkeep
+!imports/books/
+imports/books/*
+!imports/books/.gitkeep
+!imports/source-vault/
+imports/source-vault/*
+!imports/source-vault/.gitkeep
+
+# qmd/config/cache state — rebuildable from vault/imports.
+.ttrpg/index/
+# Legacy generated mirror from the old qmd layout; safe to delete if present.
+.ttrpg/qmd-vault-view/
+
+# Project-local caches (book-ingest raw artifacts, lint/test caches, etc).
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Trash directory (for manually deleted files).
+.trash/
+
+# --- local pi/runtime caches ------------------------------------------------
+
+.pi/npm/
+.pi/git/
+.pi-home/
+
+# --- per-tool environments/build output ------------------------------------
+
+**/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+node_modules/
+*.log
+
+# --- editor / OS noise ------------------------------------------------------
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- env & secrets ----------------------------------------------------------
+
+.env
+.env.*
+!.env.example

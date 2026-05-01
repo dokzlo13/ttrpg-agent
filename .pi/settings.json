@@ -1,0 +1,49 @@
+{
+  "_comment": "Project-local pi settings. Project resources in .pi/skills, .pi/prompts, .pi/agents, and .pi/extensions are auto-discovered; don't enumerate them here.",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    {
+      "source": "npm:pi-web-access",
+      "skills": [],
+      "prompts": []
+    },
+    {
+      "source": "npm:pi-subagents",
+      "skills": [
+        "+skills/pi-subagents/SKILL.md"
+      ],
+      "prompts": []
+    },
+    {
+      "source": "npm:pi-prompt-template-model",
+      "skills": [],
+      "prompts": []
+    },
+    {
+      "source": "npm:pi-mcp-adapter",
+      "skills": [],
+      "prompts": []
+    }
+  ],
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3
+  },
+  "subagents": {
+    "disableBuiltins": true,
+    "agentOverrides": {
+      "delegate": {
+        "disabled": false
+      }
+    }
+  },
+  "shellCommandPrefix": "source ./.ttrpg/scripts/pi-shell.sh",
+  "_envOverrides": "The bash tool sources ./.ttrpg/scripts/pi-shell.sh via shellCommandPrefix. That script sets TTRPG_* paths, sources project .env for optional feature/API keys, sets QMD_CONFIG_DIR, XDG_CACHE_HOME, and QMD_LLAMA_GPU, and makes plain `qmd ...` commands project-local with lazy bootstrap. .ttrpg/scripts/pi-launch.sh and .ttrpg/scripts/pi-isolated.sh apply the same env for direct/manual qmd use. Don't put secrets in settings.json; pi only does deep merge on JSON."
+}
