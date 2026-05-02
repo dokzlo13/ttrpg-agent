@@ -70,6 +70,17 @@ def parse_bool_env(value: str | None) -> bool | None:
     return None
 
 
+def parse_positive_int_env(value: str | None, *, default: int) -> int:
+    """Parse a positive integer env var; fall back to default when unset/invalid."""
+    if value is None:
+        return default
+    try:
+        parsed = int(value.strip())
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     enabled: bool
@@ -78,6 +89,7 @@ class LLMConfig:
     model: str
     base_url: str
     mode: str = "all"  # no | all | images-only | text-only
+    max_concurrency: int = 2
 
     def redacted(self) -> dict:
         return {
@@ -87,6 +99,7 @@ class LLMConfig:
             "openai_model": self.model,
             "openai_base_url": self.base_url,
             "openai_api_key_present": bool(self.api_key),
+            "max_concurrency": self.max_concurrency,
         }
 
 
@@ -217,6 +230,9 @@ def resolve_llm_config(
     base_url = (
         cli_base_url or env.get("TTRPG_MARKER_OPENAI_BASE_URL") or "https://api.openai.com/v1"
     )
+    max_concurrency = parse_positive_int_env(
+        env.get("TTRPG_MARKER_LLM_MAX_CONCURRENCY"), default=2
+    )
     return LLMConfig(
         enabled=enabled,
         enabled_source=enabled_source,
@@ -224,6 +240,7 @@ def resolve_llm_config(
         model=model,
         base_url=base_url,
         mode=mode,
+        max_concurrency=max_concurrency,
     )
 
 

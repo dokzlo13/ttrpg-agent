@@ -77,13 +77,12 @@ ttrpg-agent/
 | Node.js + npm | pi, qmd, pi packages, 5etools JS helpers | Node 22+ for qmd (pi itself needs 20.6+); current working machine uses Node 24. Official download or nvm: <https://nodejs.org/en/download> |
 | pi | coding-agent harness | `npm install -g @mariozechner/pi-coding-agent` per pi README |
 | qmd | local BM25/vector/hybrid Markdown search | `npm install -g @tobilu/qmd` per qmd npm/GitHub |
-| Python 3.11+ | uv tools and local helper CLIs | Python 3.12 recommended for Marker |
-| uv | Python tool/project runner | `curl -LsSf https://astral.sh/uv/install.sh \| sh` or `brew install uv`; docs: <https://docs.astral.sh/uv/getting-started/installation> |
+| uv | Python tool/project runner and interpreter manager | `curl -LsSf https://astral.sh/uv/install.sh \| sh` or `brew install uv`; docs: <https://docs.astral.sh/uv/getting-started/installation>. Prefer `uv run`/`uv tool` over system Python. |
 | marker-pdf / `marker_single` | PDF → Markdown/JSON conversion | `uv tool install --python 3.12 --reinstall marker-pdf --with psutil`; project tools call `marker_single` |
 | ripgrep / `rg` | fast repo/vault search used by agents | `sudo apt install ripgrep`, `brew install ripgrep`, or winget; docs: <https://ripgrep.dev> |
 | fd | fast file discovery used by humans/agents | `sudo apt install fd-find` on Ubuntu (binary is often `fdfind`), `brew install fd`, or winget; upstream: <https://github.com/sharkdp/fd> |
 | jq | inspect JSON ingest reports and qmd/tool output | `sudo apt install jq`, `brew install jq`, or winget |
-| Bash + coreutils | shell wrappers in `.ttrpg/scripts/` | Linux/macOS/WSL first-class; native Windows is not the primary target |
+| Bash + coreutils | shell wrappers in `.pi/scripts/` | Linux/macOS/WSL first-class; native Windows is not the primary target |
 
 ### Required accounts/keys for the intended stack
 
@@ -106,7 +105,7 @@ These commands assume Linux or WSL2. macOS users can replace apt packages with H
 ```bash
 # 1. System packages
 sudo apt update
-sudo apt install -y git curl build-essential python3 python3-venv jq ripgrep fd-find
+sudo apt install -y git curl build-essential jq ripgrep fd-find
 
 # Ubuntu/Debian names fd as fdfind. Add fd if needed.
 command -v fd >/dev/null || sudo ln -s "$(command -v fdfind)" /usr/local/bin/fd
@@ -121,6 +120,7 @@ npm install -g @mariozechner/pi-coding-agent @tobilu/qmd
 
 # 4. uv + Marker
 curl -LsSf https://astral.sh/uv/install.sh | sh
+# uv will provision/use the requested Python for Python-based tools.
 uv tool install --python 3.12 --reinstall marker-pdf --with psutil
 
 # 5. Clone/fork this workspace
@@ -132,7 +132,7 @@ cp .env.example .env
 Authenticate pi with your subscription, then run the one-time guided bootstrap prompt:
 
 ```bash
-./.ttrpg/scripts/pi-launch.sh
+./.pi/scripts/pi-launch.sh
 # inside pi, if not authenticated yet: /login → choose ChatGPT Plus/Pro (Codex)
 # inside pi: /bootstrap
 ```
@@ -142,8 +142,22 @@ Authenticate pi with your subscription, then run the one-time guided bootstrap p
 First launch may install project pi packages declared in `.pi/settings.json`. If you want a fully isolated run that ignores global pi config, use:
 
 ```bash
-./.ttrpg/scripts/pi-isolated.sh
+./.pi/scripts/pi-isolated.sh
 ```
+
+### Python command policy
+
+Use `uv` for Python execution instead of raw `python`/`python3`, including quick one-off scripts. Add temporary libraries with `--with` rather than installing them globally:
+
+```bash
+uv run --with requests python - <<'PY'
+import requests
+response = requests.get('https://httpbin.org/get')
+print(f"Status Code: {response.status_code}")
+PY
+```
+
+Project helper CLIs should be run with `uv run --project .pi/cli/<tool> ...`; standalone Python tools such as Marker should be installed with `uv tool install ...`.
 
 ### Bootstrap smoke checks
 
@@ -158,7 +172,7 @@ fd --version
 marker_single --help
 
 # From repo root; shell wrapper creates folders and registers qmd collections.
-source ./.ttrpg/scripts/pi-shell.sh
+source ./.pi/scripts/pi-shell.sh
 qmd collection list
 qmd status
 ```
@@ -239,7 +253,7 @@ Current project defaults:
   - `pi-prompt-template-model` for richer prompt-template support.
   - `pi-mcp-adapter` for MCP gateway support.
 - Built-in subagents are disabled except the configured delegate path; project subagents live in `.pi/agents/`.
-- `shellCommandPrefix` sources `.ttrpg/scripts/pi-shell.sh`, so pi bash commands automatically use project-local qmd state and project `.env` values.
+- `shellCommandPrefix` sources `.pi/scripts/pi-shell.sh`, so pi bash commands automatically use project-local qmd state and project `.env` values.
 
 Do not put secrets in `.pi/settings.json`.
 
@@ -253,16 +267,19 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 | `TTRPG_IMAGE_MODEL` | image generation | Default `gpt-image-1` |
 | `TTRPG_IMAGE_SIZE` | image generation | `1024x1024`, `1536x1024`, `1024x1536`, etc. |
 | `TTRPG_IMAGE_QUALITY` | image generation | `auto`, `low`, `high` depending on model/account |
+| `TTRPG_IMAGE_OUTPUT_FORMAT` | image generation | `png`, `jpeg`, or `webp`; default `png` |
 | `TTRPG_IMAGE_OUTPUT_DIR` | image generation | Must stay under `vault/notes/images` |
 | `TTRPG_MARKER_LLM_MODE` | book ingest | `no`, `images-only`, `text-only`, `all` |
 | `TTRPG_MARKER_OPENAI_MODEL` | book ingest | Default `gpt-4o-mini` for Marker LLM calls |
+| `TTRPG_MARKER_OPENAI_BASE_URL` | book ingest | OpenAI-compatible base URL; default `https://api.openai.com/v1` |
+| `TTRPG_MARKER_LLM_MAX_CONCURRENCY` | book ingest | Parallel Marker LLM calls; default `2`, lower to `1` for rate limits |
 | `TTRPG_MARKER_DEVICE` | book ingest | `auto`, `cuda`, `cpu`, `mps` |
+| `TTRPG_MARKER_*_BATCH_SIZE` | book ingest | Optional Marker local OCR/layout batch tuning |
 | `EXA_API_KEY` | web research | Optional direct Exa key for pi-web-access; Exa MCP may work without it |
 | `PERPLEXITY_API_KEY` | web research | Optional Perplexity fallback for pi-web-access |
 | `GEMINI_API_KEY` | web/video research | Optional Gemini API fallback for pi-web-access |
-| `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` | web research | Legacy/other Google search tooling if configured elsewhere |
 
-### `.ttrpg/scripts/`
+### `.pi/scripts/`
 
 - `pi-shell.sh` — shared shell setup. Exports `TTRPG_*` paths, sources project `.env` for optional feature/API keys, sets `QMD_CONFIG_DIR`, `XDG_CACHE_HOME`, CUDA/qmd fallback vars, creates skeleton directories, and wraps `qmd` so it is project-local.
 - `pi-launch.sh` — normal launcher; keeps your global pi config but localizes qmd.
@@ -278,7 +295,7 @@ Tracked by git:
 - `README.md`, `AGENTS.md`, `.env.example`, `.gitignore`, empty local-data `.gitkeep` placeholders
 - `.pi/settings.json`
 - `.pi/skills/`, `.pi/prompts/`, `.pi/agents/`, `.pi/extensions/`
-- `.ttrpg/scripts/`
+- `.pi/scripts/`
 - `.ttrpg/tools/` source, tests, lockfiles, and READMEs
 
 Ignored/local:
@@ -449,7 +466,7 @@ This separation avoids broken imports while still giving you richer Foundry text
 Normal refresh after note edits or ingest:
 
 ```bash
-source ./.ttrpg/scripts/pi-shell.sh
+source ./.pi/scripts/pi-shell.sh
 qmd update
 qmd embed      # after significant new content; can be slow
 qmd status
@@ -493,7 +510,7 @@ Where to change things:
 - New slash workflow: `.pi/prompts/<name>.md`
 - New custom tool: `.ttrpg/tools/<tool-name>/`
 - New pi tool/command/UI: `.pi/extensions/<extension-name>/`
-- qmd/shell environment: `.ttrpg/scripts/`
+- qmd/shell environment: `.pi/scripts/`
 
 After changing pi resources, run `/reload` inside pi.
 

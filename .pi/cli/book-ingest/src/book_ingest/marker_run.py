@@ -148,6 +148,12 @@ def _write_llm_config(
         "openai_api_key": llm.api_key,
         "openai_model": llm.model,
         "openai_base_url": llm.base_url,
+        # Marker defaults LLM processors to three concurrent requests.  For PDF
+        # image captioning those vision requests can burst through OpenAI TPM
+        # limits even on modest books, causing missing captions after retries.
+        # Keep this configurable so users can balance speed vs rate-limit risk;
+        # local OCR/layout work remains batched/GPU-accelerated.
+        "max_concurrency": llm.max_concurrency,
     }
     if describe_images and output_format == "markdown":
         # Marker's per-processor BOOLEAN CLI parsing is unreliable for this key;

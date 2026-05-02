@@ -15,7 +15,9 @@ Hard rules:
 - `.env` is allowed to be created/edited. `imports/`, `vault/`, and `.qmd/` are ignored local data areas.
 - Do not edit `imports/source-vault/` source files after they are copied/imported; treat it as read-only archive material.
 - Do not ingest books, generate images, run paid LLM Marker modes, clone 5etools, or copy a private vault without user approval.
-- Prefer one compact questionnaire over many single-question turns.
+- Run bootstrap as a **guided step-by-step wizard**, not a giant questionnaire. Ask only the questions needed for the current section, perform the approved actions for that section, summarize the result, then move to the next section.
+- Never ask about unrelated future sections in the same turn. It is OK to ask multiple tightly related questions inside one section, but avoid collecting every bootstrap choice up front.
+- Do not run raw `python` or `python3`; use `uv run python ...`, adding one-off libraries with `uv run --with <package> python ...`.
 - Optional features must fail gracefully: if the user skips archive vault, 5etools, books, web keys, OpenAI, or CUDA, configure the usable subset and clearly say what will be unavailable.
 
 ## 1. Welcome
@@ -24,7 +26,7 @@ Tell the user, briefly:
 
 > Welcome — you just installed the ultimate D&D 5e + Foundry VTT agent toolchain. This stack can search your campaign notes and ingested books, query a local 5etools mirror for canonical creatures/spells/items, ingest RPG PDFs into an Obsidian-friendly library, write reusable vault notes/read-alouds/NPCs, convert OSR material to 5e, format Foundry statblock importer text/enrichers, and optionally generate image assets.
 
-Then say this bootstrap will check dependencies, configure `.env`, optionally connect local source material, and run smoke tests.
+Then say this bootstrap will check dependencies, configure `.env`, optionally connect local source material, and run smoke tests. Tell the user you will do it one section at a time: ask a short section-specific question, act on the answer, summarize, then continue.
 
 ## 2. Inspect current repo and dependencies
 
@@ -37,8 +39,8 @@ printf 'node='; node --version 2>/dev/null || true
 printf 'npm='; npm --version 2>/dev/null || true
 printf 'pi='; pi --version 2>/dev/null || true
 printf 'qmd='; qmd --version 2>/dev/null || true
-printf 'python3='; python3 --version 2>/dev/null || true
 printf 'uv='; uv --version 2>/dev/null || true
+printf 'uv_python='; uv run python --version 2>/dev/null || true
 printf 'marker_single='; marker_single --help >/dev/null 2>&1 && echo present || echo missing
 printf 'git='; git --version 2>/dev/null || true
 printf 'rg='; rg --version 2>/dev/null | head -1 || true
@@ -46,25 +48,18 @@ printf 'fd='; (fd --version 2>/dev/null || fdfind --version 2>/dev/null) | head 
 printf 'jq='; jq --version 2>/dev/null || true
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null || true
 /usr/local/cuda/bin/nvcc --version 2>/dev/null | tail -1 || nvcc --version 2>/dev/null | tail -1 || true
-python3 - <<'PY' 2>/dev/null || true
-try:
-    import torch
-    print(f"torch={torch.__version__} cuda_available={torch.cuda.is_available()}")
-    if torch.cuda.is_available():
-        print(f"torch_cuda_device={torch.cuda.get_device_name(0)} vram_bytes={torch.cuda.get_device_properties(0).total_memory}")
-except Exception as e:
-    print(f"torch_check_unavailable={type(e).__name__}: {e}")
+uv run python - <<'PY' 2>/dev/null || true
+print("torch_check_skipped=use nvidia-smi/nvcc above for CUDA; do not auto-install torch during bootstrap")
 PY
 ```
 
 Also check whether `.env` exists and whether key variables are set without printing values:
 
 ```bash
-python3 - <<'PY'
+uv run python - <<'PY'
 from pathlib import Path
 keys = [
   'OPENAI_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'GEMINI_API_KEY',
-  'GOOGLE_SEARCH_API_KEY', 'GOOGLE_SEARCH_ENGINE_ID',
   'TTRPG_MARKER_LLM_MODE', 'TTRPG_MARKER_DEVICE',
   'TTRPG_MARKER_LAYOUT_BATCH_SIZE', 'TTRPG_MARKER_DETECTION_BATCH_SIZE',
   'TTRPG_MARKER_RECOGNITION_BATCH_SIZE', 'TTRPG_MARKER_TABLE_REC_BATCH_SIZE',
@@ -85,7 +80,7 @@ PY
 
 Summarize missing hard dependencies with concrete install suggestions, e.g.:
 
-- Debian/Ubuntu/WSL: `sudo apt install -y git curl build-essential python3 python3-venv jq ripgrep fd-find`
+- Debian/Ubuntu/WSL: `sudo apt install -y git curl build-essential jq ripgrep fd-find`
 - fd symlink if needed: `command -v fd >/dev/null || sudo ln -s "$(command -v fdfind)" /usr/local/bin/fd`
 - Node: install Node 22+ (Node 24 OK) via nvm/official installer.
 - pi + qmd: `npm install -g @mariozechner/pi-coding-agent @tobilu/qmd`
@@ -104,28 +99,52 @@ Briefly explain:
 - `imports/5etools/` is an optional local 5etools mirror for canonical creature/spell/item lookups.
 - `qmd` indexes notes/books/archive locally. Empty optional folders are OK.
 
-## 4. Ask configuration questionnaire
+## 4. Configure `.env` one subsection at a time
 
-Ask the user one compact questionnaire. Include these choices:
+Do **not** ask all configuration questions at once. Iterate through the subsections below in order. For each subsection:
 
-1. **OpenAI API-backed features:** enable image generation? enable Marker LLM cleanup/captions? If yes, ask whether `OPENAI_API_KEY` is already in the environment or should be pasted/stored in `.env`. Explain metered cost.
-2. **Marker LLM mode:** choose `no`, `images-only`, `text-only`, or `all`.
-   - Recommend `no` for fastest/free local ingest.
-   - Recommend `images-only` if they have an OpenAI key and want searchable figure/map captions at moderate cost.
-   - Warn that `text-only`/`all` can make hundreds/thousands of calls on large books.
-3. **Marker device/performance:** propose the best reliable config from detected hardware.
-   - If CUDA is available: recommend `TTRPG_MARKER_DEVICE=cuda` and batch preset `layout=8`, `detection=8`, `recognition=128`, `table_rec=8` as a stable fast default. If VRAM is under 8 GB, recommend `4/4/64/4` or blank batch sizes. If VRAM is 16+ GB, say the stable default is still `8/8/128/8`, and optionally offer a later benchmark before raising it.
-   - If Apple Silicon/MPS appears available: recommend `TTRPG_MARKER_DEVICE=mps` and blank batch sizes.
-   - Otherwise recommend `TTRPG_MARKER_DEVICE=auto` or `cpu` and blank batch sizes.
-4. **pi-web-access:** explain that `.pi/scripts/pi-shell.sh` sources `.env` before pi starts, so project `.env` can provide web keys to pi-web-access. Ask whether to configure web research keys in `.env`. If system-level env vars already exist, offer to mirror them into `.env` without displaying values. Ask for any of `EXA_API_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, and/or legacy `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`; leaving them blank is OK if Exa MCP, Gemini Web/browser login, or global `~/.pi/web-search.json` handles web access.
-5. **Default image settings:** if image generation is enabled, accept defaults unless user wants changes: `gpt-image-1`, `1024x1024`, `auto`, `png`, output under `vault/notes/images`.
+1. Ask only that subsection's short question(s).
+2. Wait for the user's answer.
+3. Update `.env` immediately if the user approved a change.
+4. Summarize what changed or what was skipped.
+5. Then proceed to the next subsection.
 
-After the user answers, create `.env` from `.env.example` if needed and update only the selected keys. Use a small script or precise edits. Preserve unrelated lines and comments. Never display secret values.
+Subsections:
+
+### 4A. Marker local performance
+
+Propose the best reliable `TTRPG_MARKER_DEVICE` and batch config from detected hardware, then ask whether to apply it.
+
+- If CUDA is available: recommend `TTRPG_MARKER_DEVICE=cuda` and batch preset `layout=8`, `detection=8`, `recognition=128`, `table_rec=8` as a stable fast default. If VRAM is under 8 GB, recommend `4/4/64/4` or blank batch sizes. If VRAM is 16+ GB, say the stable default is still `8/8/128/8`, and optionally offer a later benchmark before raising it.
+- If Apple Silicon/MPS appears available: recommend `TTRPG_MARKER_DEVICE=mps` and blank batch sizes.
+- Otherwise recommend `TTRPG_MARKER_DEVICE=auto` or `cpu` and blank batch sizes.
+
+### 4B. OpenAI API-backed features
+
+Ask whether to enable image generation and/or Marker LLM cleanup/captions. Explain that these are metered. If yes, ask whether `OPENAI_API_KEY` is already in the environment or should be pasted/stored in `.env`. Never print the key.
+
+### 4C. Marker LLM mode
+
+Ask for Marker LLM mode only after 4B is settled. Choose `no`, `images-only`, `text-only`, or `all`.
+
+- Recommend `no` for fastest/free local ingest.
+- Recommend `images-only` if they have an OpenAI key and want searchable figure/map captions at moderate cost.
+- Warn that `text-only`/`all` can make hundreds/thousands of calls on large books.
+
+### 4D. Web research keys
+
+Explain that `.pi/scripts/pi-shell.sh` sources `.env` before pi starts, so project `.env` can provide web keys to pi-web-access. Ask whether to configure web research keys in `.env`. If system-level env vars already exist, offer to mirror them into `.env` without displaying values. Ask only for keys the user wants to configure now: `EXA_API_KEY`, `PERPLEXITY_API_KEY`, and/or `GEMINI_API_KEY`. Leaving them blank is OK if Exa MCP, Gemini Web/browser login, or global `~/.pi/web-search.json` handles web access.
+
+### 4E. Default image settings
+
+Only if image generation is enabled, ask whether to keep defaults: `gpt-image-1`, `1024x1024`, `auto`, `png`, output under `vault/notes/images`. Apply defaults unless the user wants changes.
+
+When applying any subsection, create `.env` from `.env.example` if needed and update only the selected keys. Use a small script or precise edits. Preserve unrelated lines and comments. Never display secret values.
 
 Safe script pattern for `.env` updates (adapt keys/values from the user's answers; use values from `os.environ` only with consent):
 
 ```bash
-python3 - <<'PY'
+uv run python - <<'PY'
 from pathlib import Path
 updates = {
   # 'TTRPG_MARKER_LLM_MODE': 'no',
@@ -152,9 +171,9 @@ PY
 chmod 600 .env 2>/dev/null || true
 ```
 
-## 5. Ask/import optional source material
+## 5. Ask/import optional source material one source type at a time
 
-Ask and act on these, with disclaimers:
+Do **not** ask about archive, 5etools, and books all at once. Iterate through the subsections below in order. For each source type: ask the section-specific question, wait for the answer, perform approved action(s), summarize, then continue.
 
 ### Existing Obsidian vault / archive notes
 

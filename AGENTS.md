@@ -43,6 +43,25 @@ Track repo machinery only.
 
 ---
 
+## Tooling and Python execution
+
+Prefer project-local, reproducible tool commands over system interpreters. In particular:
+
+- Do **not** run ad-hoc Python with raw `python` or `python3`.
+- Use `uv run python - <<'PY' ... PY` for temporary Python snippets.
+- If a one-off snippet needs optional packages, inject them with `uv run --with <package> python - <<'PY' ... PY` instead of installing globally.
+- Use `uv run --project .pi/cli/<tool> ...` for project helper CLIs, and `uv tool install ...` for standalone Python tools such as Marker.
+
+Example:
+
+```bash
+uv run --with requests python - <<'PY'
+import requests
+response = requests.get('https://httpbin.org/get')
+print(f"Status Code: {response.status_code}")
+PY
+```
+
 ## Vault writing and links
 
 Before creating, moving, or migrating durable notes, canvases, or vault artifacts, read/use **`ttrpg-vault-authoring`**.

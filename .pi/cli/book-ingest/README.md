@@ -219,7 +219,10 @@ When an LLM mode other than `no` resolves, the wrapper:
    `TTRPG_MARKER_OPENAI_BASE_URL` (CLI flags win).
 3. Writes a `0600`-mode `marker-config-<format>.json` in scratch with the key.
 4. Calls Marker with `--use_llm --llm_service marker.services.openai.OpenAIService`.
-5. For `images-only`, adds `--processors <normal non-LLM processors +
+5. Sets Marker LLM `max_concurrency` from `TTRPG_MARKER_LLM_MAX_CONCURRENCY`
+   (default `2`) in the temp config to reduce OpenAI TPM bursts from parallel
+   vision calls. Local OCR/layout GPU batching is unchanged.
+6. For `images-only`, adds `--processors <normal non-LLM processors +
    LLMImageDescriptionProcessor>` and only does that on the Markdown run.
 
 If `OPENAI_API_KEY` is not set when LLM mode resolves on, the run aborts
@@ -236,6 +239,7 @@ TTRPG_MARKER_LLM_MODE=images-only                   # no | images-only | text-on
 OPENAI_API_KEY=sk-...
 TTRPG_MARKER_OPENAI_MODEL=gpt-4o-mini
 TTRPG_MARKER_OPENAI_BASE_URL=https://api.openai.com/v1
+TTRPG_MARKER_LLM_MAX_CONCURRENCY=2
 
 TTRPG_MARKER_DEVICE=cuda
 TTRPG_MARKER_LAYOUT_BATCH_SIZE=8

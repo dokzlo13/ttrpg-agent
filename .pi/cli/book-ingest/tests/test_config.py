@@ -5,6 +5,7 @@ from book_ingest.config import (
     parse_bool_env,
     parse_dotenv,
     parse_llm_mode,
+    parse_positive_int_env,
     resolve_llm_config,
     resolve_llm_mode,
     resolve_tristate,
@@ -94,6 +95,14 @@ def test_resolve_llm_config_default_off():
     assert cfg.enabled_source == "default"
     assert cfg.mode == "no"
     assert cfg.api_key is None
+    assert cfg.max_concurrency == 2
+
+
+def test_parse_positive_int_env():
+    assert parse_positive_int_env("4", default=2) == 4
+    assert parse_positive_int_env("0", default=2) == 2
+    assert parse_positive_int_env("nope", default=2) == 2
+    assert parse_positive_int_env(None, default=2) == 2
 
 
 def test_parse_llm_mode_aliases():
@@ -167,6 +176,16 @@ def test_resolve_llm_config_falls_back_to_env_model_when_no_cli():
         env={"TTRPG_MARKER_OPENAI_MODEL": "env-model"},
     )
     assert cfg.model == "env-model"
+
+
+def test_resolve_llm_config_uses_env_max_concurrency():
+    cfg = resolve_llm_config(
+        cli_use_llm=None,
+        cli_model=None,
+        cli_base_url=None,
+        env={"TTRPG_MARKER_LLM_MAX_CONCURRENCY": "4"},
+    )
+    assert cfg.max_concurrency == 4
 
 
 def test_resolve_tristate_cli_wins():

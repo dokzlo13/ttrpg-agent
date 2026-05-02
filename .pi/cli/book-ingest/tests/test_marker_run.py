@@ -38,6 +38,7 @@ def _llm(mode: str = "all") -> LLMConfig:
         model="m",
         base_url="https://x/v1",
         mode=mode,
+        max_concurrency=2,
     )
 
 
@@ -97,6 +98,7 @@ def test_write_llm_config_omits_override_when_describe_off(tmp_path):
     payload = json.loads(p.read_text())
     assert "LLMImageDescriptionProcessor_extract_images" not in payload
     assert payload["openai_api_key"] == "sekrit"
+    assert payload["max_concurrency"] == 2
 
 
 def test_write_llm_config_images_only_disables_line_merge_llm_toggle(tmp_path):
