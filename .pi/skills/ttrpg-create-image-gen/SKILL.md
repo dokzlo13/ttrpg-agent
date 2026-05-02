@@ -21,17 +21,18 @@ lowest-priority capability.
 
 ## Tool
 
-The project tool is:
+Call the `generate_image` tool from the `.pi/extensions/image-gen` extension.
+The agent receives parameters as a typed object — no shell quoting:
 
-```bash
-uv run --project .pi/cli/image-gen image-gen --subject "<prompt>"
+```text
+generate_image({ subject: "<prompt>" })
 ```
 
 Dry-run first if the request is ambiguous or you want to show the planned paths
 without spending credits:
 
-```bash
-uv run --project .pi/cli/image-gen image-gen --subject "<prompt>" --dry-run
+```text
+generate_image({ subject: "<prompt>", dryRun: true })
 ```
 
 The tool reads `OPENAI_API_KEY` from `.env` or the shell. Optional defaults are
@@ -44,6 +45,9 @@ TTRPG_IMAGE_QUALITY=auto
 TTRPG_IMAGE_OUTPUT_FORMAT=png
 TTRPG_IMAGE_OUTPUT_DIR=vault/notes/images
 ```
+
+The tool returns `{ imagePath, notePath, markdownEmbed, ... }` in `details` so
+you do not need to parse text output to learn the saved paths.
 
 ## Output contract
 
@@ -92,44 +96,46 @@ Key details: <3-7 concrete details>.
 Constraints: no watermark, no logo, no extra text unless explicitly requested, no copyrighted/branded characters.
 ```
 
-### CLI parameter tuning
+### Parameter tuning
 
 Defaults are intentionally conservative:
 
-```bash
---model gpt-image-1 --size 1024x1024 --quality auto --output-format png
+```text
+model=gpt-image-1, size=1024x1024, quality=auto, outputFormat=png
 ```
 
 Deviate per call when the asset has a clear need:
 
-| Goal | Suggested CLI params | Notes |
+| Goal | Suggested params | Notes |
 |---|---|---|
-| Fast/cheap draft | `--quality low --size 1024x1024` | Best for prompt iteration and thumbnails. |
-| Normal table asset | `--quality auto --size 1024x1024` | Default balance. Good for portraits, tokens, props, and quick scenes. |
-| Landscape scene / splash art | `--size 1536x1024 --quality auto` | Use for locations, battle vistas, travel scenes, wide establishing shots. |
-| Portrait / poster / handout | `--size 1024x1536 --quality auto` | Use for NPC full-body art, vertical posters, tall handouts. |
-| Final/high fidelity | `--quality high` | Use when retries are more expensive than one better attempt; especially detailed portraits, dense scenes, or image text. |
-| Latest/best model if available | `--model gpt-image-2 --quality high` | OpenAI currently recommends newer GPT Image models for best generation/editing. Use when the account supports it and quality matters more than speed/cost. |
-| Small web-friendly file | `--output-format webp` | Useful for export/sharing; keep `png` for Obsidian defaults unless size matters. |
+| Fast/cheap draft | `quality: "low", size: "1024x1024"` | Best for prompt iteration and thumbnails. |
+| Normal table asset | `quality: "auto", size: "1024x1024"` | Default balance. Good for portraits, tokens, props, and quick scenes. |
+| Landscape scene / splash art | `size: "1536x1024", quality: "auto"` | Use for locations, battle vistas, travel scenes, wide establishing shots. |
+| Portrait / poster / handout | `size: "1024x1536", quality: "auto"` | Use for NPC full-body art, vertical posters, tall handouts. |
+| Final/high fidelity | `quality: "high"` | Use when retries are more expensive than one better attempt; especially detailed portraits, dense scenes, or image text. |
+| Latest/best model if available | `model: "gpt-image-2", quality: "high"` | OpenAI currently recommends newer GPT Image models for best generation/editing. Use when the account supports it and quality matters more than speed/cost. |
+| Small web-friendly file | `outputFormat: "webp"` | Useful for export/sharing; keep `png` for Obsidian defaults unless size matters. |
 
 Examples:
 
-```bash
+```text
 # Wide location art
-uv run --project .pi/cli/image-gen image-gen \
-  --subject "Draw an original fantasy wide establishing shot of a ruined bell tower rising from a misty salt marsh, cinematic concept art, dawn light, no text, no watermark." \
-  --size 1536x1024 \
-  --quality auto
+generate_image({
+  subject: "Draw an original fantasy wide establishing shot of a ruined bell tower rising from a misty salt marsh, cinematic concept art, dawn light, no text, no watermark.",
+  size: "1536x1024",
+  quality: "auto",
+})
 
 # Highest-quality final handout, if the model is available on the account
-uv run --project .pi/cli/image-gen image-gen \
-  --subject "Create a player-facing fantasy handout: a weathered silver locket on black velvet, engraved with an abstract moth sigil, photorealistic prop, no extra text, no watermark." \
-  --model gpt-image-2 \
-  --quality high \
-  --size 1024x1024
+generate_image({
+  subject: "Create a player-facing fantasy handout: a weathered silver locket on black velvet, engraved with an abstract moth sigil, photorealistic prop, no extra text, no watermark.",
+  model: "gpt-image-2",
+  quality: "high",
+  size: "1024x1024",
+})
 ```
 
-Avoid changing the `.env` defaults for one-off needs; use CLI flags. Change `.env` only when you want a new long-term default.
+Avoid changing the `.env` defaults for one-off needs; pass tool params instead. Change `.env` only when you want a new long-term default.
 
 ### Quality choices
 

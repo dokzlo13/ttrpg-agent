@@ -27,7 +27,7 @@ lot** and would otherwise burn context on dozens of search-tool turns.
 - **No write access.** `tools: [read, grep, find, ls, bash]` deliberately
   excludes `write` and `edit`. The subagent cannot create or modify files.
 - No subagent recursion — don't spawn other subagents from inside.
-- Should not invoke `book-ingest`, `vault-sync copy`, or `image-gen`. Those
+- Should not invoke `book-ingest`, `vault-sync copy`, or `generate_image`. Those
   are write operations. `vault-sync inspect` is okay when investigating archive notes.
 
 ## Usage from the main agent
