@@ -319,7 +319,7 @@ Run all four before merging changes. They are all clean on the current
 source tree:
 
 ```bash
-cd .ttrpg/tools/book-ingest
+cd .pi/cli/book-ingest
 
 uv run ruff check .            # lint
 uv run ruff format --check .   # formatter check

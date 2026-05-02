@@ -8,7 +8,8 @@ if git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
 fi
 
 export TTRPG_ROOT="$PROJECT_ROOT"
-export TTRPG_TOOLS_DIR="$PROJECT_ROOT/.ttrpg/tools"
+export TTRPG_CLI_DIR="$PROJECT_ROOT/.pi/cli"
+export TTRPG_TOOLS_DIR="$TTRPG_CLI_DIR"
 export TTRPG_IMPORTS_DIR="$PROJECT_ROOT/imports"
 export TTRPG_BOOKS_DIR="$PROJECT_ROOT/imports/books"
 export TTRPG_SOURCE_VAULT_DIR="$PROJECT_ROOT/imports/source-vault"
@@ -26,8 +27,8 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
   set +a
 fi
 
-export QMD_CONFIG_DIR="$PROJECT_ROOT/.ttrpg/index"
-export XDG_CACHE_HOME="$PROJECT_ROOT/.ttrpg/index"
+export QMD_CONFIG_DIR="$PROJECT_ROOT/.qmd"
+export XDG_CACHE_HOME="$PROJECT_ROOT/.qmd"
 # Prefer NVIDIA's WSL CUDA toolkit over Ubuntu's old nvidia-cuda-toolkit package
 # when node-llama-cpp has to compile a local CUDA backend.
 if [ -x /usr/local/cuda/bin/nvcc ]; then

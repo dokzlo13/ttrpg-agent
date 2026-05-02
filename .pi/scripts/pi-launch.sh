@@ -3,7 +3,7 @@
 #
 # Use this by default. The agent's settings (.pi/settings.json) and skills are
 # already project-local; this script also localizes qmd for any direct/manual
-# qmd use. Inside pi, the bash tool sources .ttrpg/scripts/pi-shell.sh
+# qmd use. Inside pi, the bash tool sources .pi/scripts/pi-shell.sh
 # automatically, so the agent can just use plain `qmd ...`.
 #
 # For *full* isolation that ignores the user's global ~/.pi/agent/, use
@@ -14,7 +14,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
-source "$PROJECT_ROOT/.ttrpg/scripts/pi-shell.sh"
+source "$PROJECT_ROOT/.pi/scripts/pi-shell.sh"
 
 # Run pi. Args after `--` go straight through.
 exec pi "$@"

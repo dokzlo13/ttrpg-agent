@@ -18,7 +18,7 @@ Generate one image only when the user's request is explicit. Follow
    original archetypal alternative if needed.
 3. If the request is underspecified but still actionable, choose sensible TTRPG
    defaults instead of asking many questions. Use a dry-run when uncertain.
-4. Run `.ttrpg/tools/image-gen` to create the PNG and adjacent Markdown asset
+4. Run `.pi/cli/image-gen` to create the PNG and adjacent Markdown asset
    note in `vault/notes/images/`.
 5. Report the image path, asset note path, and markdown embed.
 6. If the user wants it attached to an NPC/location/session/etc., then read/use

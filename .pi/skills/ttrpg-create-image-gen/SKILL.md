@@ -24,14 +24,14 @@ lowest-priority capability.
 The project tool is:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen --subject "<prompt>"
+uv run --project .pi/cli/image-gen image-gen --subject "<prompt>"
 ```
 
 Dry-run first if the request is ambiguous or you want to show the planned paths
 without spending credits:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen --subject "<prompt>" --dry-run
+uv run --project .pi/cli/image-gen image-gen --subject "<prompt>" --dry-run
 ```
 
 The tool reads `OPENAI_API_KEY` from `.env` or the shell. Optional defaults are
@@ -116,13 +116,13 @@ Examples:
 
 ```bash
 # Wide location art
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Draw an original fantasy wide establishing shot of a ruined bell tower rising from a misty salt marsh, cinematic concept art, dawn light, no text, no watermark." \
   --size 1536x1024 \
   --quality auto
 
 # Highest-quality final handout, if the model is available on the account
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Create a player-facing fantasy handout: a weathered silver locket on black velvet, engraved with an abstract moth sigil, photorealistic prop, no extra text, no watermark." \
   --model gpt-image-2 \
   --quality high \

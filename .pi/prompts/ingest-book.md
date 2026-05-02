@@ -22,7 +22,7 @@ You are about to ingest a PDF book into the local vault library. Follow this exa
 3. **Spawn the `ingest-worker` subagent** with this brief:
    ```
    Ingest imports/books/<filename>.pdf into vault/library/books/.
-   Run: uv run --project .ttrpg/tools/book-ingest book-ingest --json imports/books/<filename>.pdf
+   Run: uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
    If the user asks for forced GPU or tuned ingest, add --device cuda and
    sensible batch-size flags.
    Marker LLM selector is --llm no|images-only|text-only|all. Use --llm no

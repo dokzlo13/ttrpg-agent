@@ -27,10 +27,10 @@ or ingested books before answering.
 
 | Path | Read? | Write? | What it is |
 |---|---|---|---|
-| `.pi/` | yes | yes, sparingly | Pi settings, skills, prompts, agents, extensions. |
-| `.ttrpg/tools/` | yes | only when fixing a tool | Tracked custom CLI tools. |
-| `.ttrpg/scripts/` | yes | only when fixing shell/qmd behavior | Tracked shell helpers. |
-| `.ttrpg/index/` | no | only via qmd/system skills | Ignored qmd config/cache/index state. |
+| `.pi/` | yes | yes, sparingly | Project backbone: Pi settings, skills, prompts, agents, extensions, scripts, and tools. |
+| `.pi/cli/` | yes | only when fixing a tool | Tracked custom CLI tools. |
+| `.pi/scripts/` | yes | only when fixing shell/qmd behavior | Tracked shell helpers. |
+| `.qmd/` | no | only via qmd/system skills | Ignored qmd config/cache/index state. |
 | `imports/books/` | file list only | no | Ignored raw PDFs/EPUBs supplied by the user. |
 | `imports/source-vault/` | yes | **NO** | Ignored legacy vault; read-only inspiration/source material. |
 | `imports/5etools/` | yes | no | Ignored 5etools mirror clone. |
@@ -38,7 +38,7 @@ or ingested books before answering.
 | `vault/notes/` | yes | yes | Active authored campaign notes, canvases, and table prep; flexible internal structure. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book markdown, cross-linked by book/chapter. |
 
-**Data policy:** all user/campaign/reference data is ignored by git (`vault/`, `imports/`, `.ttrpg/index/`).
+**Data policy:** all user/campaign/reference data is ignored by git (`vault/`, `imports/`, `.qmd/`).
 Track repo machinery only.
 
 ---

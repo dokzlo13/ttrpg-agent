@@ -9,7 +9,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
-source "$PROJECT_ROOT/.ttrpg/scripts/pi-shell.sh"
+source "$PROJECT_ROOT/.pi/scripts/pi-shell.sh"
 
 # Fully isolate pi: PI_CODING_AGENT_DIR replaces ~/.pi/agent/ as the search
 # root for inherited config. Pointing it at ./.pi-home (an empty dir we create

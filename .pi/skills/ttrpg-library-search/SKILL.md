@@ -68,8 +68,8 @@ user might need to ingest the relevant book.
 
 ## Index location & freshness
 
-The index lives at `.ttrpg/index/`. Inside pi, plain `qmd` commands are made
-project-local automatically via `shellCommandPrefix` loading `.ttrpg/scripts/pi-shell.sh`.
+The index lives at `.qmd/`. Inside pi, plain `qmd` commands are made
+project-local automatically via `shellCommandPrefix` loading `.pi/scripts/pi-shell.sh`.
 After ingesting a book or making large note edits, run `qmd update` to refresh
 the index.
 

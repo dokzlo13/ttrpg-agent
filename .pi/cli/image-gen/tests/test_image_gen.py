@@ -37,7 +37,7 @@ def test_slugify(raw: str, expected: str) -> None:
 
 def test_dry_run_json_creates_indexable_paths(tmp_path, monkeypatch) -> None:
     project = tmp_path
-    (project / ".ttrpg" / "tools" / "image-gen").mkdir(parents=True)
+    (project / ".pi" / "cli" / "image-gen").mkdir(parents=True)
     (project / "vault" / "notes" / "images").mkdir(parents=True)
     monkeypatch.setenv("TTRPG_ROOT", str(project))
 
@@ -62,7 +62,7 @@ def test_dry_run_json_creates_indexable_paths(tmp_path, monkeypatch) -> None:
 
 def test_rejects_dest_outside_images(tmp_path, monkeypatch) -> None:
     project = tmp_path
-    (project / ".ttrpg" / "tools" / "image-gen").mkdir(parents=True)
+    (project / ".pi" / "cli" / "image-gen").mkdir(parents=True)
     monkeypatch.setenv("TTRPG_ROOT", str(project))
 
     result = CliRunner().invoke(
@@ -76,7 +76,7 @@ def test_rejects_dest_outside_images(tmp_path, monkeypatch) -> None:
 
 def test_requires_exactly_one_prompt_source(tmp_path, monkeypatch) -> None:
     project = tmp_path
-    (project / ".ttrpg" / "tools" / "image-gen").mkdir(parents=True)
+    (project / ".pi" / "cli" / "image-gen").mkdir(parents=True)
     monkeypatch.setenv("TTRPG_ROOT", str(project))
 
     result = CliRunner().invoke(main, ["--dry-run"])

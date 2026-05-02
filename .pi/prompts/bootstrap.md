@@ -12,7 +12,7 @@ Hard rules:
 
 - Start with the welcome message in step 1.
 - Never print secrets. Do not paste `.env` contents back to the user if keys may be present.
-- `.env` is allowed to be created/edited. `imports/`, `vault/`, and `.ttrpg/index/` are ignored local data areas.
+- `.env` is allowed to be created/edited. `imports/`, `vault/`, and `.qmd/` are ignored local data areas.
 - Do not edit `imports/source-vault/` source files after they are copied/imported; treat it as read-only archive material.
 - Do not ingest books, generate images, run paid LLM Marker modes, clone 5etools, or copy a private vault without user approval.
 - Prefer one compact questionnaire over many single-question turns.
@@ -117,7 +117,7 @@ Ask the user one compact questionnaire. Include these choices:
    - If CUDA is available: recommend `TTRPG_MARKER_DEVICE=cuda` and batch preset `layout=8`, `detection=8`, `recognition=128`, `table_rec=8` as a stable fast default. If VRAM is under 8 GB, recommend `4/4/64/4` or blank batch sizes. If VRAM is 16+ GB, say the stable default is still `8/8/128/8`, and optionally offer a later benchmark before raising it.
    - If Apple Silicon/MPS appears available: recommend `TTRPG_MARKER_DEVICE=mps` and blank batch sizes.
    - Otherwise recommend `TTRPG_MARKER_DEVICE=auto` or `cpu` and blank batch sizes.
-4. **pi-web-access:** explain that `.ttrpg/scripts/pi-shell.sh` sources `.env` before pi starts, so project `.env` can provide web keys to pi-web-access. Ask whether to configure web research keys in `.env`. If system-level env vars already exist, offer to mirror them into `.env` without displaying values. Ask for any of `EXA_API_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, and/or legacy `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`; leaving them blank is OK if Exa MCP, Gemini Web/browser login, or global `~/.pi/web-search.json` handles web access.
+4. **pi-web-access:** explain that `.pi/scripts/pi-shell.sh` sources `.env` before pi starts, so project `.env` can provide web keys to pi-web-access. Ask whether to configure web research keys in `.env`. If system-level env vars already exist, offer to mirror them into `.env` without displaying values. Ask for any of `EXA_API_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, and/or legacy `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`; leaving them blank is OK if Exa MCP, Gemini Web/browser login, or global `~/.pi/web-search.json` handles web access.
 5. **Default image settings:** if image generation is enabled, accept defaults unless user wants changes: `gpt-image-1`, `1024x1024`, `auto`, `png`, output under `vault/notes/images`.
 
 After the user answers, create `.env` from `.env.example` if needed and update only the selected keys. Use a small script or precise edits. Preserve unrelated lines and comments. Never display secret values.
@@ -188,7 +188,7 @@ If books are present and the user approves ingestion, warn that large batches ca
 
 ```text
 Ingest imports/books/<filename>.pdf into vault/library/books/.
-Run: uv run --project .ttrpg/tools/book-ingest book-ingest --json imports/books/<filename>.pdf
+Run: uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
 Use the .env Marker defaults. If CUDA was configured and the user approved tuned CUDA, add the matching --device/batch-size flags only if needed.
 Report slug, page_count, section_count, plan_source, quality_status, warnings, total time.
 ```
@@ -200,17 +200,17 @@ After ingestion, run `qmd update` and `qmd embed`. If ingestion fails due to mis
 Ensure skeleton directories exist:
 
 ```bash
-mkdir -p imports/books imports/source-vault imports/5etools vault/notes vault/library/books vault/notes/images .ttrpg/index
+mkdir -p imports/books imports/source-vault imports/5etools vault/notes vault/library/books vault/notes/images .qmd
 ```
 
 Run smoke tests appropriate to enabled features:
 
 ```bash
-source ./.ttrpg/scripts/pi-shell.sh
+source ./.pi/scripts/pi-shell.sh
 qmd collection list
 qmd status
-uv run --project .ttrpg/tools/book-ingest book-ingest --help >/dev/null
-uv run --project .ttrpg/tools/image-gen image-gen --help >/dev/null 2>&1 || true
+uv run --project .pi/cli/book-ingest book-ingest --help >/dev/null
+uv run --project .pi/cli/image-gen image-gen --help >/dev/null 2>&1 || true
 ```
 
 If 5etools is present, test a tiny query with `query_5etools` (e.g. creature name `goblin`, output `summary`, limit `1`) or a read-only file check under `imports/5etools/data` if the tool is not available in this context.

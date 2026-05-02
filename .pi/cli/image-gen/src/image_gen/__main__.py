@@ -83,7 +83,7 @@ def find_project_root() -> Path:
 
     cwd = Path.cwd().resolve()
     for candidate in (cwd, *cwd.parents):
-        if (candidate / ".ttrpg" / "tools" / "image-gen").exists():
+        if (candidate / ".pi" / "cli" / "image-gen").exists():
             return candidate
         if (candidate / ".git").exists() and (candidate / ".env.example").exists():
             return candidate
@@ -279,7 +279,7 @@ def write_asset_note(
 
 ## Sources
 
-- Generated with OpenAI Images API via `.ttrpg/tools/image-gen`.
+- Generated with OpenAI Images API via `.pi/cli/image-gen`.
 """.lstrip()
 
     planned.note_path.write_text("\n".join(frontmatter_lines) + "\n" + body, encoding="utf-8")

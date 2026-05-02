@@ -23,7 +23,7 @@ writes a lot of files.
   the subagent's own scratch under `vault/library/books/<slug>/.tmp/`
   (cleaned at end), and `.cache/book-ingest/` (raw Marker artifacts for
   debugging; project-local, gitignored).
-- Drives `.ttrpg/tools/book-ingest`, which itself shells out to marker.
+- Drives `.pi/cli/book-ingest`, which itself shells out to marker.
 - Plans sections deterministically from the PDF outline or from Marker's
   JSON `SectionHeader` blocks. No LLM in the planning loop.
 
@@ -38,7 +38,7 @@ writes a lot of files.
 - Does **not** parse or convert statblocks. Conversion is a separate workflow
   (`statblock-converter`).
 
-## The pipeline (per `.ttrpg/tools/book-ingest/README.md`)
+## The pipeline (per `.pi/cli/book-ingest/README.md`)
 
 1. Hash the input PDF; compare to existing `<slug>/.ingest.json` source_hash
    AND schema_version. Skip when both match unless `--force`.
@@ -62,7 +62,7 @@ writes a lot of files.
 Prefer `--json` when invoked by an agent so output is structured:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest --json imports/books/<filename>.pdf
+uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
 ```
 
 Optional flags worth knowing:

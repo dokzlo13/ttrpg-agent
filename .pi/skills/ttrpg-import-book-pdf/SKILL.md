@@ -3,7 +3,7 @@ name: ttrpg-import-book-pdf
 description: |
   Ingest a PDF book into the searchable vault library. Use when the user adds
   a new PDF to imports/books/ and asks to "ingest", "add this book", "process
-  this PDF", or similar. Wraps .ttrpg/tools/book-ingest.
+  this PDF", or similar. Wraps .pi/cli/book-ingest.
 ---
 
 # ttrpg-import-book-pdf
@@ -28,12 +28,12 @@ one-off handout conversion (use `ttrpg-import-raw-pdf`), or copying notes from t
    runs:
 
    ```bash
-   uv run --project .ttrpg/tools/book-ingest book-ingest imports/books/<filename>.pdf
+   uv run --project .pi/cli/book-ingest book-ingest imports/books/<filename>.pdf
    # On a CUDA machine, force/tune if needed:
-   # uv run --project .ttrpg/tools/book-ingest book-ingest imports/books/<filename>.pdf --device cuda
+   # uv run --project .pi/cli/book-ingest book-ingest imports/books/<filename>.pdf --device cuda
    # LLM modes: --llm no|images-only|text-only|all
    # For agent automation that prefers structured output:
-   # uv run --project .ttrpg/tools/book-ingest book-ingest --json imports/books/<filename>.pdf
+   # uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
    ```
 
 4. The tool writes generated reference output under
@@ -69,7 +69,7 @@ If the user manually edits a book directory or a stale ingest needs a
 fresh quality report:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest validate \
+uv run --project .pi/cli/book-ingest book-ingest validate \
   vault/library/books/<book-slug>
 ```
 
@@ -92,7 +92,7 @@ For image discoverability ("find the bronze medal", "where's the dungeon
 map"), prefer:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest \
+uv run --project .pi/cli/book-ingest book-ingest \
   --llm images-only imports/books/<filename>.pdf
 ```
 
@@ -131,7 +131,7 @@ Marker auto-selects CUDA when its PyTorch install sees a CUDA GPU. If you
 need to force or tune:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest imports/books/<file>.pdf \
+uv run --project .pi/cli/book-ingest book-ingest imports/books/<file>.pdf \
   --device cuda \
   --layout-batch-size 8 \
   --detection-batch-size 8 \
@@ -143,7 +143,7 @@ If marker runs out of VRAM, lower or omit the batch sizes.
 ## Failure modes
 
 - **Marker missing / wrong version**: tell the user to install marker per
-  `.ttrpg/tools/book-ingest/README.md`.
+  `.pi/cli/book-ingest/README.md`.
 - **Hash + schema match, no `--force`**: report the skip; this is normal idempotence.
 - **`schema_version` mismatch**: tool auto-forces re-ingest with a warning.
 - **Quality status `failed`**: a section file or `_book.md` is missing.
@@ -159,4 +159,4 @@ If marker runs out of VRAM, lower or omit the batch sizes.
 
 ## Reference
 
-CLI contract: `.ttrpg/tools/book-ingest/README.md`.
+CLI contract: `.pi/cli/book-ingest/README.md`.

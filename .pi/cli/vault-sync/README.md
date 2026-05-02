@@ -25,25 +25,25 @@ Core rule:
 
 ```bash
 # List archive markdown files: path, body lines, file size, title.
-uv run --project .ttrpg/tools/vault-sync vault-sync list --filter "*.md"
+uv run --project .pi/cli/vault-sync vault-sync list --filter "*.md"
 
 # Inspect one archive note. This makes no type or destination guesses.
-uv run --project .ttrpg/tools/vault-sync vault-sync inspect \
+uv run --project .pi/cli/vault-sync vault-sync inspect \
   "imports/source-vault/messy/Lord Blackthorne.md"
 
 # Copy one archive note to an explicit LLM-chosen active-notes path.
-uv run --project .ttrpg/tools/vault-sync vault-sync copy \
+uv run --project .pi/cli/vault-sync vault-sync copy \
   "imports/source-vault/messy/Lord Blackthorne.md" \
   "vault/notes/npcs/lord-blackthorne.md"
 
 # Also copy resolvable local non-md embeds/images without rewriting the markdown.
-uv run --project .ttrpg/tools/vault-sync vault-sync copy \
+uv run --project .pi/cli/vault-sync vault-sync copy \
   "imports/source-vault/messy/Lord Blackthorne.md" \
   "vault/notes/npcs/lord-blackthorne.md" \
   --copy-attachments
 
 # Validate a copy plan without writing anything.
-uv run --project .ttrpg/tools/vault-sync vault-sync copy \
+uv run --project .pi/cli/vault-sync vault-sync copy \
   "imports/source-vault/messy/Lord Blackthorne.md" \
   "vault/notes/npcs/lord-blackthorne.md" \
   --copy-attachments --dry-run
@@ -90,5 +90,5 @@ an existing active note, do that instead of copying it.
 ## Testing
 
 ```bash
-uv run --project .ttrpg/tools/vault-sync pytest .ttrpg/tools/vault-sync/tests
+uv run --project .pi/cli/vault-sync pytest .pi/cli/vault-sync/tests
 ```

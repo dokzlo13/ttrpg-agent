@@ -25,7 +25,7 @@ TTRPG_IMAGE_OUTPUT_DIR=vault/notes/images
 Dry-run first. This does not call OpenAI or write files:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Draw an original fantasy portrait of a tired dwarf cartographer, ink and watercolor, warm lamplight, no text, no watermark." \
   --dry-run
 ```
@@ -33,14 +33,14 @@ uv run --project .ttrpg/tools/image-gen image-gen \
 Generate a real asset:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Draw an original fantasy portrait of a tired dwarf cartographer, ink and watercolor, warm lamplight, no text, no watermark."
 ```
 
 Use a prompt file for longer prompts:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --prompt-file /tmp/cartographer-prompt.md \
   --title "Dwarf Cartographer"
 ```
@@ -48,7 +48,7 @@ uv run --project .ttrpg/tools/image-gen image-gen \
 Machine-readable output for agent workflows:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Draw a moonlit ruined chapel in the marsh, cinematic wide shot, no text." \
   --json
 ```
@@ -85,19 +85,19 @@ Use CLI flags for one-off deviations:
 
 ```bash
 # Fast prompt iteration
-uv run --project .ttrpg/tools/image-gen image-gen --subject "..." --quality low
+uv run --project .pi/cli/image-gen image-gen --subject "..." --quality low
 
 # Wide landscape/location art
-uv run --project .ttrpg/tools/image-gen image-gen --subject "..." --size 1536x1024
+uv run --project .pi/cli/image-gen image-gen --subject "..." --size 1536x1024
 
 # Tall portrait or poster-style handout
-uv run --project .ttrpg/tools/image-gen image-gen --subject "..." --size 1024x1536
+uv run --project .pi/cli/image-gen image-gen --subject "..." --size 1024x1536
 
 # Final high-fidelity generation, if available on the account
-uv run --project .ttrpg/tools/image-gen image-gen --subject "..." --model gpt-image-2 --quality high
+uv run --project .pi/cli/image-gen image-gen --subject "..." --model gpt-image-2 --quality high
 
 # Smaller web-friendly output file
-uv run --project .ttrpg/tools/image-gen image-gen --subject "..." --output-format webp
+uv run --project .pi/cli/image-gen image-gen --subject "..." --output-format webp
 ```
 
 Rule of thumb: iterate with `quality low` or `auto`, then make one final pass with higher quality/model only when the prompt is stable.

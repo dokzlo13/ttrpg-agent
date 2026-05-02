@@ -1,7 +1,7 @@
 ---
 name: ttrpg-system-data-cleanup
 description: |
-  Destructive cleanup/reset procedures for the gitignored TTRPG workspace data: qmd indexes, vault notes, ingested book output, and imports. Use when the user asks to clean up, wipe, reset, purge, or remove vault/import/index data. Requires explicit scope selection, dry-run inventory, and confirmation before deleting anything. Never touches .pi, .ttrpg/tools, .ttrpg/scripts, repo files, or Obsidian settings.
+  Destructive cleanup/reset procedures for the gitignored TTRPG workspace data: qmd indexes, vault notes, ingested book output, and imports. Use when the user asks to clean up, wipe, reset, purge, or remove vault/import/index data. Requires explicit scope selection, dry-run inventory, and confirmation before deleting anything. Never touches .pi, .pi/cli, .pi/scripts, repo files, or Obsidian settings.
 ---
 
 # ttrpg-system-data-cleanup
@@ -22,8 +22,8 @@ This skill is intentionally conservative. If the user says only "clean up the va
 5. **Never touch protected paths** under this skill:
    - `.git/`
    - `.pi/` including skills, prompts, settings, extensions, npm cache
-   - `.ttrpg/tools/`
-   - `.ttrpg/scripts/`
+   - `.pi/cli/`
+   - `.pi/scripts/`
    - `AGENTS.md`, `.gitignore`, README/package/config files
    - `vault/.obsidian/` unless the user explicitly asks outside this skill; default is always preserve it
 6. **Prefer manifests over surprises.** Save a deletion manifest in `/tmp/` before deleting so the user can see what was targeted.
@@ -36,8 +36,8 @@ When the user has not chosen a precise scope, offer these options:
 
 | Scope | Deletes | Preserves / notes |
 |---|---|---|
-| `search-index` | `.ttrpg/index/qmd/` and legacy `.ttrpg/qmd-vault-view/` | Keeps uv/datalab/model caches. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. |
-| `all-index-caches` | Contents of `.ttrpg/index/` plus `.ttrpg/qmd-vault-view/` | Keeps `.ttrpg/index/` directory. May force model/cache re-downloads. Does **not** touch `.ttrpg/tools/`. |
+| `search-index` | `.qmd/qmd/` | Keeps uv/datalab/model caches. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. |
+| `all-index-caches` | Contents of `.qmd/` | Keeps `.qmd/` directory. May force model/cache re-downloads. Does **not** touch `.pi/cli/`. |
 | `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. |
 | `ingested-books` | Generated book folders under `vault/library/books/`, either all or selected slugs | Keeps `vault/library/books/` directory. Does not delete source PDFs in `imports/books/`. |
 | `book-ingest-cache` | Contents of `.cache/book-ingest/`, all or per-hash | Keeps `.cache/book-ingest/` directory. Safe: cache is debug-only; the canonical content stays in `vault/library/books/`. |
@@ -48,7 +48,7 @@ When the user has not chosen a precise scope, offer these options:
 | `imports-5etools` | Contents of `imports/5etools/` | Keeps `imports/5etools/` directory if possible. Warn that canonical 5e lookup tools may stop working until the mirror is restored. |
 | `imports-all` | Contents of `imports/books/`, `imports/source-vault/`, and `imports/5etools/` | Keeps `imports/` and child directories. Warn about losing PDFs/archive and disabling local 5etools. |
 | `full-data-reset` | `vault-content` + `imports-all` + `all-index-caches` | Preserves all backbone folders/settings. Requires especially clear confirmation. |
-| `custom-paths` | Only explicitly listed paths under allowed data roots | Refuse paths outside `vault/`, `imports/`, `.ttrpg/index/`, or `.ttrpg/qmd-vault-view/`. |
+| `custom-paths` | Only explicitly listed paths under allowed data roots | Refuse paths outside `vault/`, `imports/`, `.qmd/`, or `.cache/`. |
 
 Allowed data roots for deletion are only:
 
@@ -59,8 +59,7 @@ vault/images/                 # if present, generated images only
 imports/books/
 imports/source-vault/
 imports/5etools/
-.ttrpg/index/
-.ttrpg/qmd-vault-view/
+.qmd/
 .cache/                       # project-local tool caches (book-ingest etc.)
 ```
 
@@ -73,7 +72,7 @@ Do not assume other `vault/*` folders are disposable. Inventory them and ask bef
 
    ```bash
    pwd
-   du -sh vault imports .ttrpg/index .ttrpg/qmd-vault-view 2>/dev/null || true
+   du -sh vault imports .qmd 2>/dev/null || true
    find <target> -mindepth 1 -maxdepth 2 -print 2>/dev/null | sort | head -200
    ```
 
@@ -101,7 +100,7 @@ After every destructive block, run a separate verification command such as:
 ```bash
 cd /path/to/ttrpg-agent
 find vault -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
-find .ttrpg/index -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
+find .qmd -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
 find imports -maxdepth 2 -mindepth 1 -type d -print 2>/dev/null | sort
 ```
 
@@ -115,9 +114,9 @@ vault/library/books
 imports/books
 imports/source-vault
 imports/5etools
-.ttrpg/index/datalab/models
-.ttrpg/index/qmd/models
-.ttrpg/index/uv
+.qmd/datalab/models
+.qmd/qmd/models
+.qmd/uv
 ```
 
 
@@ -129,14 +128,12 @@ cd /path/to/ttrpg-agent
 stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-search-index.txt"
 {
-  find .ttrpg/index/qmd -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
-  find .ttrpg/qmd-vault-view -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
+  find .qmd/qmd -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
 } | sort > "$manifest"
-if [ -d .ttrpg/index/qmd ]; then
-  find .ttrpg/index/qmd -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf -- {} +
+if [ -d .qmd/qmd ]; then
+  find .qmd/qmd -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf -- {} +
 fi
-rm -rf .ttrpg/qmd-vault-view
-mkdir -p .ttrpg/index/qmd/models
+mkdir -p .qmd/qmd/models
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -144,7 +141,7 @@ Then, in a **separate** command, rebuild if the user wants search usable immedia
 
 ```bash
 cd /path/to/ttrpg-agent
-source ./.ttrpg/scripts/pi-shell.sh
+source ./.pi/scripts/pi-shell.sh
 qmd update
 # qmd embed   # only when semantic search/vectors are needed
 qmd status
@@ -158,12 +155,10 @@ cd /path/to/ttrpg-agent
 stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-all-index-caches.txt"
 {
-  find .ttrpg/index -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
-  find .ttrpg/qmd-vault-view -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
+  find .qmd -mindepth 1 ! -name .gitkeep -print 2>/dev/null || true
 } | sort > "$manifest"
-find .ttrpg/index -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf -- {} +
-rm -rf .ttrpg/qmd-vault-view
-mkdir -p .ttrpg/index/datalab/models .ttrpg/index/qmd/models .ttrpg/index/uv
+find .qmd -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf -- {} +
+mkdir -p .qmd/datalab/models .qmd/qmd/models .qmd/uv
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -353,14 +348,14 @@ A full reset is just the confirmed combination of:
 2. `imports-all`
 3. `all-index-caches`
 
-Run the individual blocks, not a single `rm -rf vault imports .ttrpg/index`. Recreate the skeleton afterwards:
+Run the individual blocks, not a single `rm -rf vault imports .qmd`. Recreate the skeleton afterwards:
 
 ```bash
 mkdir -p vault/notes vault/notes/mechanics vault/notes/readalouds vault/library/books
 touch vault/.gitkeep vault/notes/.gitkeep vault/library/.gitkeep vault/library/books/.gitkeep
 mkdir -p imports/books imports/source-vault imports/5etools
 touch imports/.gitkeep imports/books/.gitkeep imports/source-vault/.gitkeep
-mkdir -p .ttrpg/index/datalab/models .ttrpg/index/qmd/models .ttrpg/index/uv
+mkdir -p .qmd/datalab/models .qmd/qmd/models .qmd/uv
 ```
 
 ## Post-cleanup qmd handling
@@ -369,7 +364,7 @@ Run qmd handling only after the destructive block has completed and the skeleton
 
 ```bash
 cd /path/to/ttrpg-agent
-source ./.ttrpg/scripts/pi-shell.sh
+source ./.pi/scripts/pi-shell.sh
 qmd update
 qmd status
 ```
@@ -387,7 +382,7 @@ See also `ttrpg-system-qmd-maintenance` for normal qmd rebuild and verification 
 
 Refuse or re-clarify if:
 
-- The user asks to delete `.pi/`, `.ttrpg/tools/`, `.ttrpg/scripts/`, or repo configuration as part of "cleanup".
+- The user asks to delete `.pi/`, `.pi/cli/`, `.pi/scripts/`, or repo configuration as part of "cleanup".
 - A custom path resolves outside the allowed data roots.
 - The user gives a broad destructive request but will not provide an exact confirmation phrase.
 - The requested cleanup would remove `vault/.obsidian/`; explain that this skill preserves Obsidian settings and ask for a separate explicit maintenance task if truly needed.

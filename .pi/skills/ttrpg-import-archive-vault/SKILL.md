@@ -9,7 +9,7 @@ description: |
 
 # ttrpg-import-archive-vault
 
-Wraps `.ttrpg/tools/vault-sync`. This is **not** an rsync, classifier, or auto-router.
+Wraps `.pi/cli/vault-sync`. This is **not** an rsync, classifier, or auto-router.
 The old vault may be messy and semantically unreliable, so the LLM makes all decisions.
 The tool only reports factual note metadata and safely copies a chosen file.
 
@@ -40,7 +40,7 @@ mirroring.
    ```
 2. Read promising source notes directly. Inspect for quick facts if useful:
    ```bash
-   uv run --project .ttrpg/tools/vault-sync vault-sync inspect \
+   uv run --project .pi/cli/vault-sync vault-sync inspect \
      "imports/source-vault/random/lord blackthorne.md"
    ```
 3. Decide semantically what to do:
@@ -52,7 +52,7 @@ mirroring.
 4. Use `ttrpg-vault-authoring` to choose the destination. The script does not choose.
 5. Copy only after choosing an explicit destination under `vault/notes/`:
    ```bash
-   uv run --project .ttrpg/tools/vault-sync vault-sync copy \
+   uv run --project .pi/cli/vault-sync vault-sync copy \
      "imports/source-vault/random/lord blackthorne.md" \
      "vault/notes/npcs/lord-blackthorne.md"
    ```
@@ -70,9 +70,9 @@ mirroring.
 Use this when the user names a specific archive note and the destination is obvious:
 
 ```bash
-uv run --project .ttrpg/tools/vault-sync vault-sync inspect \
+uv run --project .pi/cli/vault-sync vault-sync inspect \
   "imports/source-vault/cities/Dunemark.md"
-uv run --project .ttrpg/tools/vault-sync vault-sync copy \
+uv run --project .pi/cli/vault-sync vault-sync copy \
   "imports/source-vault/cities/Dunemark.md" \
   "vault/notes/locations/dunemark.md"
 ```
@@ -111,4 +111,4 @@ migration candidates.
 
 ## Reference
 
-`.ttrpg/tools/vault-sync/README.md`.
+`.pi/cli/vault-sync/README.md`.

@@ -13,7 +13,7 @@ or the user asks to "reindex", "refresh qmd", "rebuild search", or "fix the data
 
 ## Project qmd shape
 
-The shell wrapper `.ttrpg/scripts/pi-shell.sh` makes qmd project-local and registers three
+The shell wrapper `.pi/scripts/pi-shell.sh` makes qmd project-local and registers three
 non-overlapping collections:
 
 | Collection | Source |
@@ -22,7 +22,7 @@ non-overlapping collections:
 | `books` | `vault/library/books/` generated book-ingest output |
 | `archive` | `imports/source-vault/` optional legacy notes, excluded from default queries |
 
-There is no generated qmd vault mirror. `.ttrpg/index/` is rebuildable qmd config/cache/index state.
+There is no generated qmd vault mirror. `.qmd/` is rebuildable qmd config/cache/index state.
 
 ## Normal refresh
 
@@ -75,8 +75,8 @@ Use only when normal `qmd update` leaves stale/deleted docs, collection paths ar
 or after major folder migrations:
 
 ```bash
-rm -rf .ttrpg/index/qmd .ttrpg/qmd-vault-view
-source ./.ttrpg/scripts/pi-shell.sh
+rm -rf .qmd/qmd
+source ./.pi/scripts/pi-shell.sh
 qmd update
 qmd embed
 qmd status
@@ -84,8 +84,7 @@ qmd status
 
 Notes:
 
-- `.ttrpg/qmd-vault-view` is legacy and safe to delete if present.
-- This preserves `.ttrpg/index/uv/` and other non-qmd cache data.
+- This preserves `.qmd/uv/` and other non-qmd cache data.
 - It may re-download/rebuild qmd models if qmd's model cache is removed.
 - If semantic search is not needed immediately, skip `qmd embed` and mention that vectors are stale/missing.
 
@@ -97,15 +96,15 @@ protected paths. This skill is for qmd health and rebuilds, not broad deletion.
 
 For qmd specifically:
 
-- **Search-index cleanup** deletes only `.ttrpg/index/qmd/` and legacy `.ttrpg/qmd-vault-view/`.
+- **Search-index cleanup** deletes only `.qmd/qmd/`.
   This is the preferred destructive qmd reset because it preserves uv/datalab/model caches.
-- **All-index-caches cleanup** deletes the contents of `.ttrpg/index/` and `.ttrpg/qmd-vault-view/`.
+- **All-index-caches cleanup** deletes the contents of `.qmd/`.
   Use only when the user explicitly wants all local index/cache state removed; this may force
-  model/cache re-downloads. It still must not touch `.ttrpg/tools/` or `.ttrpg/scripts/`.
+  model/cache re-downloads. It still must not touch `.pi/cli/` or `.pi/scripts/`.
 - After deleting vault notes, ingested books, or archive imports, run `qmd update` so deleted docs
   disappear from search results.
 - After deleting ingested books without re-ingesting, `qmd embed` is usually unnecessary.
-- Never delete `.ttrpg/` wholesale as qmd maintenance.
+- Never delete `.pi/` as qmd maintenance; qmd maintenance is limited to `.qmd/`.
 
 ## Smoke test pattern
 
@@ -127,7 +126,7 @@ The first search should find the note; the final search should not.
 - **`Collection not found: books,notes`**: collection names were comma-joined. Use repeated flags:
   `qmd query "term" -c books -c notes`.
 - **Book chunks appear in `notes` results**: verify `qmd collection show notes` points at `vault/notes`,
-  not `vault` or `.ttrpg/qmd-vault-view`, then do a full rebuild.
+  not `vault`, then do a full rebuild.
 - **Archive results appear unexpectedly**: run `qmd collection exclude archive` and search archive only with `-c archive`.
 - **No new notes appear**: run `qmd update`; verify `qmd collection show notes` points at `vault/notes`.
 - **Semantic results are poor after ingest**: run `qmd embed` after `qmd update`.

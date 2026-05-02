@@ -24,10 +24,7 @@ imports/source-vault/*
 !imports/source-vault/.gitkeep
 
 # qmd/config/cache state — rebuildable from vault/imports.
-.ttrpg/index/
-# Legacy generated mirror from the old qmd layout; safe to delete if present.
-.ttrpg/qmd-vault-view/
-
+.qmd/
 # Project-local caches (book-ingest raw artifacts, lint/test caches, etc).
 .cache/
 .pytest_cache/
