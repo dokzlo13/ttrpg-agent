@@ -229,7 +229,7 @@ source ./.pi/scripts/pi-shell.sh
 qmd collection list
 qmd status
 uv run --project .pi/cli/book-ingest book-ingest --help >/dev/null
-uv run --project .pi/cli/image-gen image-gen --help >/dev/null 2>&1 || true
+test -f .pi/extensions/image-gen/index.ts && echo "image-gen extension present"
 ```
 
 If 5etools is present, test a tiny query with `query_5etools` (e.g. creature name `goblin`, output `summary`, limit `1`) or a read-only file check under `imports/5etools/data` if the tool is not available in this context.

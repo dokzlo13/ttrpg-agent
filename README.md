@@ -262,7 +262,7 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 
 | Key | Used by | Notes |
 |---|---|---|
-| `OPENAI_API_KEY` | `image-gen`, `book-ingest --llm ...` | Required for image generation and any non-`no` Marker LLM mode |
+| `OPENAI_API_KEY` | `generate_image` tool, `book-ingest --llm ...` | Required for image generation and any non-`no` Marker LLM mode |
 | `TTRPG_IMAGE_MODEL` | image generation | Default `gpt-image-1` |
 | `TTRPG_IMAGE_SIZE` | image generation | `1024x1024`, `1536x1024`, `1024x1536`, etc. |
 | `TTRPG_IMAGE_QUALITY` | image generation | `auto`, `low`, `high` depending on model/account |
@@ -425,16 +425,17 @@ Highlights:
 - Supports `--llm no|images-only|text-only|all`.
 - Python deps: `click`, `pypdf`, `pyyaml`; dev deps include `pytest`, `ruff`, `mypy`.
 
-### `.pi/cli/image-gen`
+### `.pi/extensions/image-gen`
 
-A uv-managed OpenAI Images CLI:
+A Pi extension exposing the `generate_image` tool. Called as a typed tool, not a subprocess:
 
-```bash
-uv run --project .pi/cli/image-gen image-gen \
-  --subject "Original fantasy portrait of a tired dwarf cartographer, no text, no watermark."
+```text
+generate_image({
+  subject: "Original fantasy portrait of a tired dwarf cartographer, no text, no watermark.",
+})
 ```
 
-It writes `vault/notes/images/<slug>-<hash>.png` and an adjacent `.md` asset note containing frontmatter, prompt, params, sanitized response metadata, adoption notes, and connections.
+It writes `vault/notes/images/<slug>-<hash>.png` and an adjacent `.md` asset note containing frontmatter, prompt, params, sanitized response metadata, adoption notes, and connections. No npm dependencies; tests run via `node --test .pi/extensions/image-gen/*.test.js`.
 
 ### `.pi/cli/vault-sync`
 
