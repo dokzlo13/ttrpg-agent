@@ -49,11 +49,10 @@ ttrpg-agent/
 │   ├── skills/                # task-specific operating procedures
 │   ├── prompts/               # slash prompts, e.g. /find-monster
 │   ├── agents/                # focused subagent definitions
-│   └── extensions/            # project-local pi extensions, incl. query_5etools
-├── .ttrpg/
+│   ├── extensions/            # project-local pi extensions, incl. query_5etools
 │   ├── scripts/               # launch/qmd environment wrappers
-│   ├── tools/                 # uv-managed helper CLIs
-│   └── index/                 # ignored qmd config/cache/index state
+│   └── cli/                   # uv-managed helper CLIs
+├── .qmd/                      # ignored qmd config/cache/index/model state
 ├── imports/                   # ignored raw inputs/reference mirrors
 │   ├── books/                 # source PDFs/EPUBs
 │   ├── source-vault/          # optional old vault; treated read-only
@@ -63,7 +62,7 @@ ttrpg-agent/
     └── library/books/         # generated book-ingest output
 ```
 
-`vault/notes/` is the main writing surface. `vault/library/books/` is generated reference material. `imports/` is input/reference data. `.ttrpg/index/` is rebuildable qmd state.
+`vault/notes/` is the main writing surface. `vault/library/books/` is generated reference material. `imports/` is input/reference data. `.qmd/` is rebuildable qmd state.
 
 ---
 
@@ -207,7 +206,7 @@ Inside pi:
 Or manually:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest imports/books/My-Adventure.pdf
+uv run --project .pi/cli/book-ingest book-ingest imports/books/My-Adventure.pdf
 qmd update
 qmd embed
 ```
@@ -296,14 +295,14 @@ Tracked by git:
 - `.pi/settings.json`
 - `.pi/skills/`, `.pi/prompts/`, `.pi/agents/`, `.pi/extensions/`
 - `.pi/scripts/`
-- `.ttrpg/tools/` source, tests, lockfiles, and READMEs
+- `.pi/cli/` source, tests, lockfiles, and READMEs
 
 Ignored/local:
 
 - `.env`, `.env.*` except `.env.example`
 - `vault/` contents — Obsidian vault, active campaign notes, generated images, ingested book output. Empty skeleton directories are kept with `.gitkeep`.
 - `imports/` contents — source PDFs, legacy vault, 5etools clone. Empty import directories are kept with `.gitkeep` except `imports/5etools/`, which must remain clone-friendly.
-- `.ttrpg/index/` — qmd config/cache/index/model state
+- `.qmd/` — qmd config/cache/index/model state
 - `.cache/`, `.trash/`, test caches, virtualenvs, node_modules
 - `.pi/npm/`, `.pi/git/`, `.pi-home/` — project-local pi runtime/package caches
 
@@ -385,7 +384,7 @@ Prompt templates live in `.pi/prompts/` and are invoked inside pi with `/name`:
 
 Subagents live in `.pi/agents/` and are used when a task would otherwise flood the main session with logs/context.
 
-- `ingest-worker` — long-running PDF ingestion through `.ttrpg/tools/book-ingest`; writes only under `vault/library/books/` and `.cache/book-ingest/`.
+- `ingest-worker` — long-running PDF ingestion through `.pi/cli/book-ingest`; writes only under `vault/library/books/` and `.cache/book-ingest/`.
 - `researcher` — read-only broad search across books, notes, archive, 5etools snippets, and web.
 - `statblock-converter` — one-monster conversion agent that saves monster notes under `vault/notes/mechanics/monsters/` and emits Foundry importer text.
 
@@ -408,13 +407,13 @@ It exposes a project-local pi tool for common 5etools lookups:
 
 For unsupported 5etools entity types or renderer weirdness, agents use `ttrpg-rules-5etools-native` and small read-only Node snippets against `imports/5etools/`.
 
-### `.ttrpg/tools/book-ingest`
+### `.pi/cli/book-ingest`
 
 A uv-managed Python CLI that converts PDFs into sectioned Markdown:
 
 ```bash
-uv run --project .ttrpg/tools/book-ingest book-ingest imports/books/My-Book.pdf
-uv run --project .ttrpg/tools/book-ingest book-ingest validate vault/library/books/my-book
+uv run --project .pi/cli/book-ingest book-ingest imports/books/My-Book.pdf
+uv run --project .pi/cli/book-ingest book-ingest validate vault/library/books/my-book
 ```
 
 Highlights:
@@ -426,24 +425,24 @@ Highlights:
 - Supports `--llm no|images-only|text-only|all`.
 - Python deps: `click`, `pypdf`, `pyyaml`; dev deps include `pytest`, `ruff`, `mypy`.
 
-### `.ttrpg/tools/image-gen`
+### `.pi/cli/image-gen`
 
 A uv-managed OpenAI Images CLI:
 
 ```bash
-uv run --project .ttrpg/tools/image-gen image-gen \
+uv run --project .pi/cli/image-gen image-gen \
   --subject "Original fantasy portrait of a tired dwarf cartographer, no text, no watermark."
 ```
 
 It writes `vault/notes/images/<slug>-<hash>.png` and an adjacent `.md` asset note containing frontmatter, prompt, params, sanitized response metadata, adoption notes, and connections.
 
-### `.ttrpg/tools/vault-sync`
+### `.pi/cli/vault-sync`
 
 A deliberately dumb, safe copy/inspect tool for legacy archive notes:
 
 ```bash
-uv run --project .ttrpg/tools/vault-sync vault-sync inspect imports/source-vault/path/Note.md
-uv run --project .ttrpg/tools/vault-sync vault-sync copy imports/source-vault/path/Note.md vault/notes/npcs/note.md
+uv run --project .pi/cli/vault-sync vault-sync inspect imports/source-vault/path/Note.md
+uv run --project .pi/cli/vault-sync vault-sync copy imports/source-vault/path/Note.md vault/notes/npcs/note.md
 ```
 
 It never decides meaning or destination. The LLM chooses placement, then edits the copied note according to vault-authoring policy.
@@ -500,7 +499,7 @@ Add a skill for my homebrew hexcrawl procedures and make future travel prep use 
 
 Extend query_5etools to support feats and backgrounds.
 
-Write a small .ttrpg tool that exports selected notes as Foundry journal HTML.
+Write a small .pi/cli tool that exports selected notes as Foundry journal HTML.
 ```
 
 Where to change things:
@@ -508,7 +507,7 @@ Where to change things:
 - New agent behavior/routing: `AGENTS.md`
 - New repeatable procedure: `.pi/skills/<name>/SKILL.md`
 - New slash workflow: `.pi/prompts/<name>.md`
-- New custom tool: `.ttrpg/tools/<tool-name>/`
+- New custom CLI tool: `.pi/cli/<tool-name>/`
 - New pi tool/command/UI: `.pi/extensions/<extension-name>/`
 - qmd/shell environment: `.pi/scripts/`
 
