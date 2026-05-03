@@ -1,23 +1,17 @@
 # book-ingest
 
 Convert a TTRPG PDF into clean, sectioned, cross-linked Markdown under
-`vault/library/books/<book-slug>/` for retrieval, citation, and Obsidian
-browsing. Generated reference material — authored campaign notes live
-separately under `vault/notes/`.
+`vault/library/books/` for retrieval, citation, and Obsidian browsing.
+Generated reference material lives separately from authored campaign notes in
+`vault/notes/`.
 
 ## Quick usage
 
 ```bash
 uv sync
 
-# Single book. Marker auto-selects CUDA when its PyTorch install sees a GPU.
+# Single book. Marker uses the pinned Python 3.12 project venv and CUDA when available.
 uv run book-ingest imports/books/PHB-2024.pdf
-
-# Folder of PDFs.
-uv run book-ingest imports/books/
-
-# Re-ingest after the PDF changed (or to override hash skip).
-uv run book-ingest imports/books/PHB-2024.pdf --force
 
 # Fastest: no LLM/API calls.
 uv run book-ingest imports/books/PHB-2024.pdf --llm no
@@ -25,26 +19,51 @@ uv run book-ingest imports/books/PHB-2024.pdf --llm no
 # Image captions only (needs OPENAI_API_KEY). Good default for searchable art/maps.
 uv run book-ingest imports/books/PHB-2024.pdf --llm images-only
 
-# Full Marker LLM text/table/header/page cleanup; slow + metered.
-uv run book-ingest imports/books/PHB-2024.pdf --llm text-only
-
-# Full cleanup plus image captions; slowest.
-uv run book-ingest imports/books/PHB-2024.pdf --llm all
+# Machine-readable summary for an agent caller.
+uv run book-ingest --json imports/books/PHB-2024.pdf
 
 # Re-run quality checks against an already-ingested book.
 uv run book-ingest validate vault/library/books/phb-2024
 
-# Machine-readable summary for an agent caller.
-uv run book-ingest --json imports/books/PHB-2024.pdf
+# Classify the rules system from front/back matter evidence (needs OPENAI_API_KEY).
+uv run book-ingest classify-system phb-2024
+
+# Add metered detailed chapter summaries, then refresh overview suffixes.
+uv run book-ingest summarize phb-2024
+
+# Main tagging prep: summarize only chapters too long for full-text tag calls.
+uv run book-ingest summarize phb-2024 --long-only
+# Optional custom size threshold:
+uv run book-ingest summarize phb-2024 --long-only --long-threshold 30000
+
+# Add metered Obsidian tags. Small chapters are tagged from full text; long ones use summaries.
+uv run book-ingest tag phb-2024
+# Optional matching full-text threshold:
+uv run book-ingest tag phb-2024 --full-text-chars 30000
+
+# Manual fallback for one agent-reviewed chapter; CLI verifies hash and writes safely.
+uv run book-ingest tag-manual phb-2024 03-haunted-inn.md --body-hash sha256:abc --tag location --tag monster
+
+# Refresh an overview after summaries/tags change chapter frontmatter.
+uv run book-ingest refresh-overview phb-2024
 ```
+
+This project is pinned to Python 3.12 (`.python-version`) because the current
+Marker/PyTorch CUDA stack is known-good there. On the user's WSL Ubuntu setup,
+`marker-pdf==1.10.2` resolves to `torch==2.11.0+cu130`, which sees the CUDA GPU.
 
 ## CLI surface
 
-Two commands. `ingest` is the default — `book-ingest <pdf>` is shorthand
-for `book-ingest ingest <pdf>`.
+`ingest` is the default — `book-ingest <pdf>` is shorthand for
+`book-ingest ingest <pdf>`.
 
 ```text
 book-ingest ingest <pdf-or-dir> [options]
+book-ingest classify-system <slug> [--force] [--json]
+book-ingest summarize <slug> [--force] [--long-only] [--long-threshold N] [--json]
+book-ingest tag <slug> [--force] [--full-text-chars N] [--json]
+book-ingest tag-manual <slug> <chapter> --body-hash <hash> (--tag <tag>... | --empty) [--force] [--json]
+book-ingest refresh-overview <slug>
 book-ingest validate <book-dir> [--json] [--write/--no-write]
 ```
 
@@ -52,319 +71,221 @@ book-ingest validate <book-dir> [--json] [--write/--no-write]
 
 | Option | Default | Notes |
 |---|---|---|
-| `--output PATH` | `vault/library/books` | Where book directories land. |
-| `--cache PATH` | `<project>/.cache/book-ingest` | Raw Marker artifacts + logs. |
+| `--output PATH` | `vault/library/books` | Where book outputs land. |
 | `--force` | off | Re-run even when the source hash matches. |
 | `--dry-run` | off | Show what would be written; no Marker call. |
-| `--keep-cache / --no-keep-cache` | `--no-keep-cache` | Keep markdown/json artifacts in the cache. Logs are kept regardless. |
-| `--keep-backup / --no-keep-backup` | `--no-keep-backup` | Retain `.<slug>.<timestamp>.bak` after a replacing install. |
-| `--llm {no\|images-only\|text-only\|all}` | resolved | Preferred Marker LLM mode. CLI > `TTRPG_MARKER_LLM_MODE` > legacy bool env > `no`. |
-| `--use-llm / --no-use-llm` | resolved | Deprecated compatibility flag. Prefer `--llm`. Alone maps to `text-only`; with `--describe-images` maps to `all`. |
-| `--describe-images / --no-describe-images` | resolved | Deprecated compatibility flag. Prefer `--llm images-only` or `--llm all`. Alone maps to `images-only`. |
-| `--openai-model TEXT` | `gpt-4o-mini` | Used only when an LLM mode other than `no` resolves. |
+| `--keep-backup / --no-keep-backup` | `--no-keep-backup` | Retain dot-prefixed replacement backups. |
+| `--llm {no\|images-only\|text-only\|all}` | resolved | CLI > `TTRPG_MARKER_LLM_MODE` > `no`. |
+| `--openai-model TEXT` | `gpt-4o-mini` | Used only when LLM mode is not `no`. |
 | `--openai-base-url TEXT` | `https://api.openai.com/v1` | OpenAI-compatible endpoint. |
-| `--page-range TEXT` | none | Marker's `--page_range`, e.g. `0,5-10,20`. |
-| `--force-ocr` | off | Marker's `--force_ocr`. |
-| `--device {auto\|cuda\|cpu\|mps}` | `auto` (or env) | |
-| `--layout-batch-size`, `--detection-batch-size`, `--recognition-batch-size`, `--table-rec-batch-size` | env / Marker default | Tune for GPU. |
-| `--json` | off | Machine-readable summary on stdout. |
+| `--page-range TEXT` | none | Marker `page_range`, e.g. `0,5-10,20`. |
+| `--force-ocr` | off | Marker `force_ocr`. |
+| `--device {auto\|cuda\|cpu\|mps}` | env / `auto` | Sets `TORCH_DEVICE` before importing Marker. |
+| batch-size flags | env / Marker default | `--layout-batch-size`, `--detection-batch-size`, `--recognition-batch-size`, `--table-rec-batch-size`. |
+| `--json` | off | Machine-readable agent feedback on stdout. |
+
+Removed flags: `--cache`, `--keep-cache`, `--workers`, `--use-llm`, and
+`--describe-images`. There is no subprocess cache/log tree anymore; Marker is
+called in-process through the SDK.
 
 ## What it does
 
-1. Hash the PDF; **skip** if `<slug>/.ingest.json` already records the same
-   `source_hash` and matching `schema_version` (unless `--force`). See
-   [Re-ingestion semantics](#re-ingestion-semantics).
-2. Run `marker_single` twice into a scratch directory: once for paginated
-   Markdown (`--paginate_output`) and once for JSON (block tree). Marker's
-   model load is cached so the second call is fast.
-3. Plan sections deterministically:
-   - **PDF outline** if the PDF has `≥3` depth-0 outline entries with
-     resolvable page indices.
-   - **Marker JSON `SectionHeader` blocks** otherwise. Splitting prefers a
-     numbered-prefix pattern (`^[A-Z]?\d+\s\w`) when ≥3 headers match,
-     else `<h1>`, else the most common of `<h1>/<h2>`.
-   - Whole-book fallback as a last resort.
-4. Clean titles, drop noise (Front Cover / Title / Endpaper / Contents /
-   Copyright …), uniquify slugs, and assign per-section page ranges.
-5. Slice the paginated Markdown by `{N}-----` page markers, rewrite
-   `![](_page_N_*.jpeg)` to `![](images/_page_N_*.jpeg)`, copy referenced
-   images, and write `<NN>-<slug>.md` notes plus `_book.md`.
-6. Validate (warn-only) and write `.ingest/quality.json`.
-7. Move the staged tree to its final location atomically. If a previous
-   ingest exists, it is renamed to `.<slug>.<timestamp>.bak` (leading
-   dot — qmd skips it during indexing) and dropped on success, or kept
-   with `--keep-backup`.
+1. Hash the PDF; **skip** if `<slug>/.ingest/provenance.json` records the same
+   `source_hash` (unless `--force`).
+2. Call Marker's Python SDK once (`PdfConverter`) with paginated Markdown
+   output. The returned object provides Markdown, images, table of contents,
+   page stats, and metadata in-process.
+3. Plan sections from `rendered.metadata["table_of_contents"]`; fall back to
+   structural Markdown headings (`plan_source: marker-markdown`) when Marker
+   does not produce a usable ToC, and finally to one whole-book section only
+   when neither source is usable.
+4. Slice paginated Markdown by heading character offsets when available, else by
+   `{N}-----` page markers; rewrite image links to `images/<file>`. Empty
+   planned sections are omitted rather than written as placeholder notes.
+5. Write the overview at `vault/library/books/<slug>/__<slug>.md` and chapter
+   files in the same book directory.
+6. Validate structural invariants and write one sidecar:
+   `<slug>/.ingest/report.json`.
+7. Install the book directory atomically. On replacement, previous output is
+   moved to a dot-prefixed backup and removed after success unless
+   `--keep-backup` is passed.
 
 ## Output layout
 
 ```text
-vault/library/books/<book-slug>/
-  _book.md                      # book index with section TOC + frontmatter
-  01-<slug>.md                  # one per planned section
-  02-<slug>.md
-  ...
-  images/                       # only images referenced by section bodies
-  .ingest.json                  # provenance with schema_version
-  .ingest/                      # sidecar metadata (qmd skips dot-dirs)
-    manifest.json               # planned sections, page ranges, slugs
-    quality.json                # validation report
-    marker.json                 # redacted Marker invocation record
-    agent-next.txt              # plain-text next steps for the caller
+vault/library/books/
+└── <slug>/
+    ├── __<slug>.md            # overview / TOC; visible first in Obsidian
+    ├── 01-<section>.md        # chapter chunks; what qmd search/get returns
+    ├── 02-<section>.md
+    ├── images/
+    └── .ingest/
+        ├── provenance.json    # hash, page count, LLM/run config, system
+        └── report.json        # validation + Marker/LLM/follow-on observability
 ```
 
-## Cache policy
+Chapter files have minimal frontmatter:
 
-The cache lives at `<project>/.cache/book-ingest/<source-hash>/` (project-
-local, gitignored). It exists for *debugging*; the canonical content is
-in `vault/library/books/<slug>/`.
+```yaml
+---
+book: <slug>
+section: The Home of Ezekiel Duncaster
+section_index: 5
+page_start: 11
+page_end: 12
+body_hash: sha256:abc123…
+ingested_at: '2026-05-01T20:10:27Z'
+---
+```
 
-| Mode | Cache contents after success |
-|---|---|
-| default (`--no-keep-cache`) | `logs/marker-markdown.log`, `logs/marker-json.log` only |
-| `--keep-cache` | `logs/`, `markdown/`, `json/`, `marker-cmd.json` |
-
-Logs are *always* persisted (even with `--no-keep-cache`) because they're
-KB-size and high-value: redacted command line, returncode, duration,
-Marker version, full stdout/stderr.
-
-If the cache grows too large, run the `ttrpg-system-data-cleanup` skill with the
-`book-ingest-cache` scope, or delete `.cache/book-ingest/` manually.
-
-## Re-ingestion semantics
-
-When you run `book-ingest` against a PDF that has previously been ingested,
-the tool decides what to do based on the source hash, the schema version,
-and `--force`. There is no error path here; the choices are predictable:
-
-| Existing `<slug>/.ingest.json` | `--force`? | Behavior |
-|---|---|---|
-| same hash, same `schema_version` | no | **skip**: no Marker call, return the recorded summary, exit 0 |
-| same hash, same `schema_version` | yes | full re-ingest, replace, drop backup |
-| same hash, schema mismatch | either | log a warning, full re-ingest, replace, drop backup |
-| different hash (PDF updated) | either | full re-ingest, replace, drop backup |
-| missing `.ingest.json`, target dir present | no | **error**: `target … already exists; pass --force to replace` |
-| missing `.ingest.json`, target dir present | yes | full re-ingest, replace, drop backup |
-
-The replacement path always writes the new tree to a scratch directory,
-moves the old output to `.<slug>.<timestamp>.bak`, then atomically renames
-the new tree into place. After a successful install the backup is
-removed unless you pass `--keep-backup`. On install failure the backup
-is restored.
-
-So **multiple runs do not duplicate work** — the hash check short-
-circuits before anything expensive runs. Re-ingesting an identical PDF
-is essentially a no-op.
-
-## LLM modes and image descriptions
-
-Research note: Marker maintainers recommend `--use_llm --processors
-"marker.processors.llm.llm_image_description.LLMImageDescriptionProcessor"`
-when you want image descriptions without the full LLM pipeline. The wrapper's
-`images-only` mode uses that approach, but preserves Marker's normal non-LLM
-cleanup processors so text output stays comparable to fast/no-LLM mode.
-
-`--llm` modes:
-
-| Mode | Marker behavior | JSON planning pass |
-|---|---|---|
-| `no` | No API calls. Normal local extraction; image files are still copied. | no LLM |
-| `images-only` | Normal local extraction plus `LLMImageDescriptionProcessor` only; no table/page/header/text LLM processors. | no LLM |
-| `text-only` | Full Marker LLM cleanup for text/tables/forms/headers/pages, but no image captions. | LLM on |
-| `all` | `text-only` plus image captions. | LLM on, image captions still markdown-only |
-
-When image captions are enabled, Marker's `LLMImageDescriptionProcessor` writes a one-paragraph
-description next to each extracted image, so the section body looks like:
+Chapter bodies use this shape; generated links use full vault paths to avoid
+ambiguous same-name chapters in other book folders:
 
 ```markdown
-Treasure — Modest bronze campaign medal
+# <section title>
 
-Image /page/6/Picture/2 description: The image depicts a cluster of wooden
-structures resembling cabins, set among trees…
+<chapter text>
+
+---
+
+Previous: [[library/books/<slug>/NN-prev|Previous Title]]
+Next: [[library/books/<slug>/NN-next|Next Title]]
+Pages: 11–12
+```
+
+The overview is a normal Markdown file sorted first in the same directory. It is
+not sent to summarize/tag LLM follow-ons; it receives deterministic TOC metadata
+(`summary: Book <title> table of contents.`, `tags: [..., toc]`) when rendered.
+
+After follow-on enrichment, chapter frontmatter may also include:
+
+```yaml
+summary: Detailed retrieval summary for long chapters.
+summary_for: sha256:abc123…
+tags: [location, random-table]
+tags_for: sha256:def456…
+```
+
+`summary_for` stamps the body hash summarized. `tags_for` stamps the body hash
+plus current summary, so summaries changing correctly invalidate tags. The
+`tags` field is the Obsidian-native tag property, so these are visible in Tags
+view and searchable with Obsidian's `tag:` operator.
+
+## Image descriptions
+
+When Marker LLM image descriptions are enabled, the generated descriptions are
+rewritten into Obsidian callouts so they are visually distinct from book prose:
+
+```markdown
+> [!image] AI description
+> The image depicts a cluster of wooden structures resembling cabins…
 
 ![](images/_page_6_Picture_2.jpeg)
 ```
 
-This makes images discoverable through qmd's BM25 even when nearby body
-text doesn't reference them. The image file is still saved to disk; only
-the description is added.
+These callouts are AI-generated retrieval aids. Do not quote them as source
+text from the book.
 
-Resolution order, highest first:
+## Report shape
 
-1. `--llm no|images-only|text-only|all` on the command line.
-2. `TTRPG_MARKER_LLM_MODE=no|images-only|text-only|all` in `.env` or process env.
-3. Legacy CLI flags `--use-llm` / `--describe-images`.
-4. Legacy env booleans `TTRPG_MARKER_USE_LLM` and `TTRPG_MARKER_DESCRIBE_IMAGES`.
-5. `no` by default.
+Provenance lives in `.ingest/provenance.json` and stores redacted LLM config,
+source of resolved CLI/env/default settings, batch sizes, requested device, and
+observed Torch CUDA availability/device. Validation lives in `.ingest/report.json`:
 
-Legacy mapping: `--use-llm` alone means `text-only`; `--describe-images`
-alone means `images-only`; both together mean `all`.
+```json
+{
+  "status": "ok|review|failed",
+  "marker": {
+    "duration_seconds": 380.4,
+    "exception": null,
+    "warnings": [],
+    "llm": { "mode": "images-only", "requested": 33, "succeeded": 19, "calls": [] }
+  },
+  "findings": [],
+  "stats": {
+    "sections": 15,
+    "pages": 66,
+    "images_extracted": 33,
+    "sections_omitted_empty": 0,
+    "omitted_empty_sections": [],
+    "chars_total": 158234
+  }
+}
+```
 
-Every run prints the resolved values and their sources on stderr, e.g.:
+Retained structural finding codes include `empty_section_body`, `tiny_section`,
+`oversized_section`, `title_looks_like_ocr_noise`, `duplicate_slug`,
+`non_monotonic_pages`, `broken_image_target`, `missing_source_image`,
+`book_index_missing`, and `section_file_missing`.
+
+SDK-derived finding codes are `marker_exception`, `marker_warnings`, and
+`llm_calls_failed`. There is no log parsing and no `manifest_missing` check.
+
+## Agent stdout contract
+
+Every ingest prints one structural status line to stderr before Marker starts,
+including resolved sources for important runtime settings, for example:
 
 ```text
-book-ingest: llm_mode=images-only (source=env), use_llm=True, describe_images=True, device=cuda, model=gpt-4o-mini
+book-ingest: llm.mode=images-only[cli] llm.model=gpt-4o-mini[env] llm.concurrency=1[env] device=cuda[env] torch.cuda=true torch.gpu="NVIDIA GeForce RTX 5090" page_range=0-1[cli]
+book-ingest: llm.mode=no[default] device=cuda[env] torch.cuda=true torch.gpu="NVIDIA GeForce RTX 5090"
 ```
 
-The same is recorded in `.ingest.json → options.llm` and in
-`.ingest/marker.json`. To check without re-running:
+`--json` emits one JSON object with paths, counts, status, report path,
+`finding_summary`, non-duplicated `findings`, and ordered `next_steps`.
+Human stdout prints the same content. Agents should run returned `next_steps` in
+order. Metered follow-ons (`classify-system`, `summarize`, `tag`) are omitted
+when no `OPENAI_API_KEY` is configured; do not invent omitted steps. The final
+step is normally `qmd update && qmd embed`.
 
-```bash
-cat <book>/.ingest/marker.json | jq '.runs[0].llm'
-```
+## Follow-on subcommands
 
-When an LLM mode other than `no` resolves, the wrapper:
+Ingest does **not** guess rules systems from text heuristics. It writes
+`system: unknown` and `systems: []` until `classify-system` runs. All metered
+follow-ons require `OPENAI_API_KEY`; missing key prints a skip message and exits
+0. Each command refreshes the overview and records observability in
+`.ingest/report.json`.
 
-1. Loads project-root `.env` into the process env (without overriding).
-2. Resolves `OPENAI_API_KEY`, `TTRPG_MARKER_OPENAI_MODEL`, and
-   `TTRPG_MARKER_OPENAI_BASE_URL` (CLI flags win).
-3. Writes a `0600`-mode `marker-config-<format>.json` in scratch with the key.
-4. Calls Marker with `--use_llm --llm_service marker.services.openai.OpenAIService`.
-5. Sets Marker LLM `max_concurrency` from `TTRPG_MARKER_LLM_MAX_CONCURRENCY`
-   (default `2`) in the temp config to reduce OpenAI TPM bursts from parallel
-   vision calls. Local OCR/layout GPU batching is unchanged.
-6. For `images-only`, adds `--processors <normal non-LLM processors +
-   LLMImageDescriptionProcessor>` and only does that on the Markdown run.
+| Command | Writes to | Behavior |
+|---|---|---|
+| `classify-system <slug>` | `.ingest/provenance.json` (`system`, `systems`, `system_source: llm`, `system_confidence`, `system_rationale`) and `system/<name>` chapter/overview tags | Bounded LLM read of first/last chapters; emits all plausible system tags. |
+| `summarize <slug>` | `summary` / `summary_for` per chapter | Sends each chapter body to OpenAI in bounded parallel; skips chapters whose `summary_for` matches `body_hash` unless `--force`. |
+| `summarize <slug> --long-only` | same | Skips chapters small enough for the tagger's full-text call. This is what `next_steps` emits. |
+| `tag <slug>` | Obsidian-native `tags` / `tags_for` per chapter | One LLM call per chapter with evidence + confidence; keeps 0–3 strong tags. Small chapters use full text; long chapters use `summary` (or bounded head/tail excerpt). Empty tag set when LLM returns nothing — never invents heuristic tags. |
+| `tag-manual <slug> <chapter>` | same | Manual fallback writer. Agent reads chapter, picks 0–3 tags, passes `--body-hash`. Helper verifies hash, validates tags, preserves `book/*` and `system/*`. `--empty` writes explicit empty tag set. |
 
-If `OPENAI_API_KEY` is not set when LLM mode resolves on, the run aborts
-before invoking Marker. The key never appears on the command line.
-Provenance records only `openai_api_key_present: true`.
+Env vars for follow-ons:
 
-`.env` keys read by this tool:
+- `OPENAI_API_KEY` — required for metered commands; absent → skip+exit 0.
+- `TTRPG_MARKER_OPENAI_MODEL` — default `gpt-4o-mini`.
+- `TTRPG_MARKER_OPENAI_BASE_URL` — default `https://api.openai.com/v1`.
+- `TTRPG_SUMMARIZE_MAX_CONCURRENCY` — default `4`.
+- `TTRPG_TAG_FULL_CHAPTER_CHARS` — default `18000`. Shared by
+  `summarize --long-only` and `tag`. Overridable per command via
+  `--long-threshold N` and `--full-text-chars N`.
 
-```dotenv
-TTRPG_MARKER_LLM_MODE=images-only                   # no | images-only | text-only | all
-# Legacy fallback if TTRPG_MARKER_LLM_MODE is unset:
-# TTRPG_MARKER_USE_LLM=false
-# TTRPG_MARKER_DESCRIBE_IMAGES=false
-OPENAI_API_KEY=sk-...
-TTRPG_MARKER_OPENAI_MODEL=gpt-4o-mini
-TTRPG_MARKER_OPENAI_BASE_URL=https://api.openai.com/v1
-TTRPG_MARKER_LLM_MAX_CONCURRENCY=2
+`tags_for` stamps `body_hash + summary`, so changing summaries invalidates tags
+correctly. `summary_for` stamps `body_hash` alone.
 
-TTRPG_MARKER_DEVICE=cuda
-TTRPG_MARKER_LAYOUT_BATCH_SIZE=8
-TTRPG_MARKER_DETECTION_BATCH_SIZE=8
-TTRPG_MARKER_RECOGNITION_BATCH_SIZE=128
-TTRPG_MARKER_TABLE_REC_BATCH_SIZE=8
-```
+## LLM modes
 
-`text-only` and `all` invoke per-block LLM calls (table, header, math,
-page-correction, etc.). For a 200-page book this can be hundreds to thousands
-of calls — slow and metered. `images-only` is usually much cheaper: roughly one
-vision-model call per detected Picture/Figure block, and no LLM pass over the
-JSON planning run.
-
-## Quality validation
-
-Validation is detection-only; output is always written. Findings live in
-`.ingest/quality.json`:
-
-| Code | Meaning |
+| Mode | Marker behavior |
 |---|---|
-| `empty_section_body` | Sliced page range produced no body text. |
-| `tiny_section`, `oversized_section` | Body size out of bounds (`<200B` / `>200KB`). |
-| `title_looks_like_ocr_noise` | Section title looks like garbage. |
-| `duplicate_slug` | Two sections collapsed to the same slug; suffixed with `-2`. |
-| `non_monotonic_pages` | A section starts before the previous one ended. |
-| `broken_image_target` | Body references an image not in `images/`. |
-| `missing_source_image` | Marker did not emit a referenced image. |
-| `marker_llm_requested_but_skipped` | `--use-llm` was set without an API key. |
-| `book_index_missing`, `section_file_missing`, `manifest_missing` | Errors. |
+| `no` | No API calls. Local extraction; image files still copied. |
+| `images-only` | Local extraction plus `LLMImageDescriptionProcessor`; no table/page/header/text LLM cleanup. |
+| `text-only` | Full Marker LLM cleanup for text/tables/forms/headers/pages, but no image captions. |
+| `all` | Full cleanup plus image captions. |
 
-`status` is `failed` if any errors, else `review_required` if any
-warnings, else `ok`. Re-run validation any time with
-`book-ingest validate <book-dir>`.
-
-## GPU / performance
-
-Marker uses PyTorch and auto-selects CUDA when available. Force a device
-and tune batch sizes:
-
-```bash
-uv run book-ingest imports/books/PHB-2024.pdf --device cuda \
-  --layout-batch-size 8 --detection-batch-size 8 \
-  --recognition-batch-size 128
-```
-
-Supported devices: `auto`, `cuda`, `cpu`, `mps`. Lower or omit batch
-sizes if you hit OOM.
-
-## Schema version
-
-Current output schema is `2`. A schema mismatch in `.ingest.json`
-triggers forced re-ingest on the next run with a console warning. Bump
-the version in `book_ingest/__init__.py` (`SCHEMA_VERSION`) when the
-output layout changes in a way that requires re-running existing
-ingests.
-
-## Scope boundary
-
-This tool is a library ingester only. It does **not**:
-
-- extract statblocks or emit sidecar JSON for monsters/NPCs;
-- summarize chapters or whole books;
-- refresh `qmd`;
-- enrich images with anything beyond Marker's own LLM processor.
-
-Those decisions happen later, from the section Markdown itself.
-
-## Dependencies
-
-- System: `marker_single` from
-  [`marker-pdf`](https://github.com/datalab-to/marker), e.g.
-  `uv tool install marker-pdf`.
-- Python runtime deps (`pyproject.toml`): `click`, `pypdf`, `pyyaml`.
-- Dev deps (`pyproject.toml [dependency-groups.dev]`): `pytest`,
-  `pytest-cov`, `ruff`, `mypy`, `types-PyYAML`.
+When an LLM mode other than `no` resolves, `OPENAI_API_KEY` must be set. The
+key is passed in-memory through Marker SDK config and never written to a log.
+`TTRPG_MARKER_LLM_MAX_CONCURRENCY` controls LLM request concurrency.
 
 ## Quality gates
 
-Run all four before merging changes. They are all clean on the current
-source tree:
-
 ```bash
 cd .pi/cli/book-ingest
-
-uv run ruff check .            # lint
-uv run ruff format --check .   # formatter check
-uv run mypy .                  # types
-uv run pytest                  # unit tests
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+uv run pytest
 ```
-
-Or in one shell:
-
-```bash
-uv run ruff check . && uv run ruff format --check . \
-  && uv run mypy . && uv run pytest
-```
-
-Auto-fix lint and apply formatting:
-
-```bash
-uv run ruff check --fix .
-uv run ruff format .
-```
-
-Configuration lives in `pyproject.toml` (`[tool.ruff]`, `[tool.mypy]`,
-`[tool.pytest.ini_options]`). Unit tests cover:
-
-- `clean_title`, `slugify`, `is_noise_title`, `looks_like_ocr_noise`,
-  `book_title_from`;
-- page-marker slicing, `<span>` stripping, image-link rewriting,
-  heading deduplication;
-- `render_section_note`, `render_book_index`;
-- the marker-JSON planner path with synthetic fixtures (no Marker run);
-- `validate_book_dir` rule firing;
-- `parse_dotenv`, `parse_bool_env`, `resolve_tristate`,
-  `resolve_llm_config`;
-- `_build_command` / `_write_llm_config` for `--use-llm` and
-  `--describe-images` wiring.
-
-End-to-end smoke runs against `imports/books/*.pdf` are documented but
-not in CI (Marker requires ~500 MB of model weights and a working
-torch install).
-
-## Plan history
-
-- [`REDESIGN_PLAN.md`](REDESIGN_PLAN.md) — initial v1 proposal.
-- [`REDESIGN_PLAN_v2.md`](REDESIGN_PLAN_v2.md) — current architecture.

@@ -24,7 +24,7 @@ This repository tracks the machinery: pi skills, slash prompts, subagents, exten
 - Convert OSR/BX/OSE/AD&D-style monsters and traps into D&D 5e/2024 equivalents.
 - Produce **Foundry 5e Statblock Importer** paste text and separate Foundry dnd5e enricher prose.
 - Generate OpenAI image assets on explicit request, with adjacent Markdown asset notes for indexing.
-- Delegate slow/noisy work to focused subagents for ingest, research, and monster conversion.
+- Delegate slow/noisy work to focused subagents for research and monster conversion.
 
 ## What it is not
 
@@ -77,7 +77,7 @@ ttrpg-agent/
 | pi | coding-agent harness | `npm install -g @mariozechner/pi-coding-agent` per pi README |
 | qmd | local BM25/vector/hybrid Markdown search | `npm install -g @tobilu/qmd` per qmd npm/GitHub |
 | uv | Python tool/project runner and interpreter manager | `curl -LsSf https://astral.sh/uv/install.sh \| sh` or `brew install uv`; docs: <https://docs.astral.sh/uv/getting-started/installation>. Prefer `uv run`/`uv tool` over system Python. |
-| marker-pdf / `marker_single` | PDF → Markdown/JSON conversion | `uv tool install --python 3.12 --reinstall marker-pdf --with psutil`; project tools call `marker_single` |
+| marker-pdf | PDF → Markdown/JSON conversion | `uv tool install --python 3.12 --reinstall marker-pdf --with psutil`; the project calls Marker's Python SDK in-process and uses the bundled `marker_single` binary only for smoke checks |
 | ripgrep / `rg` | fast repo/vault search used by agents | `sudo apt install ripgrep`, `brew install ripgrep`, or winget; docs: <https://ripgrep.dev> |
 | fd | fast file discovery used by humans/agents | `sudo apt install fd-find` on Ubuntu (binary is often `fdfind`), `brew install fd`, or winget; upstream: <https://github.com/sharkdp/fd> |
 | jq | inspect JSON ingest reports and qmd/tool output | `sudo apt install jq`, `brew install jq`, or winget |
@@ -197,18 +197,17 @@ rsync -a ~/Documents/OldVault/ imports/source-vault/
 
 ### Ingest a PDF book
 
-Inside pi:
+Inside pi, just describe the intent (the agent loads the `ttrpg-import-book-pdf` skill on its own):
 
 ```text
-/ingest-book imports/books/My-Adventure.pdf
+ingest imports/books/My-Adventure.pdf
 ```
 
-Or manually:
+Or run the CLI directly. With `OPENAI_API_KEY` set, follow the ordered `next_steps` returned in the JSON output (classify-system, summarize, tag, qmd refresh):
 
 ```bash
-uv run --project .pi/cli/book-ingest book-ingest imports/books/My-Adventure.pdf
-qmd update
-qmd embed
+uv run --project .pi/cli/book-ingest book-ingest --json imports/books/My-Adventure.pdf
+qmd update && qmd embed
 ```
 
 ### Search your prep/library
@@ -345,7 +344,8 @@ Skills are procedural reference files the agent loads when a task matches. Curre
   - `ttrpg-vault-rich-notes` — table-ready Obsidian Markdown patterns.
   - `ttrpg-vault-canvas` — Obsidian Canvas JSON creation/validation.
 - **Imports**
-  - `ttrpg-import-book-pdf` — normal PDF book ingest workflow.
+  - `ttrpg-import-book-pdf` — canonical end-to-end PDF book ingest pipeline (ingest → classify-system → summarize → tag → qmd).
+  - `ttrpg-tag-book-manual` — agent-driven manual tag fallback when `OPENAI_API_KEY` is absent or for per-chapter overrides.
   - `ttrpg-import-raw-pdf` — one-off raw Marker conversion/debugging.
   - `ttrpg-import-archive-vault` — safe promotion of selected old-vault notes.
 - **Foundry**
@@ -370,7 +370,6 @@ Prompt templates live in `.pi/prompts/` and are invoked inside pi with `/name`:
 | `/bootstrap` | One-time first-run setup wizard: dependencies, `.env`, optional imports, smoke tests. |
 | `/find-monster` | Canonical monster lookup; 5etools first, qmd fallback. |
 | `/find-anything` | General qmd search across books/notes/archive. |
-| `/ingest-book` | PDF ingest workflow; delegates to `ingest-worker`. |
 | `/convert-monster` | OSR/non-5e monster → 5e + Foundry importer text. |
 | `/foundry-monster` | Normalize an existing statblock for Foundry importer paste. |
 | `/npc` | Fast NPC sketch, with optional save to vault. |
@@ -384,7 +383,6 @@ Prompt templates live in `.pi/prompts/` and are invoked inside pi with `/name`:
 
 Subagents live in `.pi/agents/` and are used when a task would otherwise flood the main session with logs/context.
 
-- `ingest-worker` — long-running PDF ingestion through `.pi/cli/book-ingest`; writes only under `vault/library/books/` and `.cache/book-ingest/`.
 - `researcher` — read-only broad search across books, notes, archive, 5etools snippets, and web.
 - `statblock-converter` — one-monster conversion agent that saves monster notes under `vault/notes/mechanics/monsters/` and emits Foundry importer text.
 
@@ -409,21 +407,21 @@ For unsupported 5etools entity types or renderer weirdness, agents use `ttrpg-ru
 
 ### `.pi/cli/book-ingest`
 
-A uv-managed Python CLI that converts PDFs into sectioned Markdown:
+A uv-managed Python CLI that converts PDFs into sectioned Markdown and drives the full ingestion lifecycle:
 
 ```bash
-uv run --project .pi/cli/book-ingest book-ingest imports/books/My-Book.pdf
+uv run --project .pi/cli/book-ingest book-ingest --json imports/books/My-Book.pdf
 uv run --project .pi/cli/book-ingest book-ingest validate vault/library/books/my-book
 ```
 
 Highlights:
 
-- Runs `marker_single` twice: paginated Markdown and JSON block tree.
-- Plans sections from PDF outline or Marker `SectionHeader` blocks.
-- Writes `_book.md`, section notes, copied images, `.ingest.json`, and quality reports.
-- Skips unchanged re-ingests by source hash and schema version.
-- Supports `--llm no|images-only|text-only|all`.
-- Python deps: `click`, `pypdf`, `pyyaml`; dev deps include `pytest`, `ruff`, `mypy`.
+- Calls Marker through its Python SDK in-process; no subprocess cache/log tree.
+- Plans sections from Marker's table of contents, falling back to structural Markdown headings.
+- Writes `vault/library/books/<slug>/__<slug>.md` overview, chapter files, copied images, and sidecars under `<slug>/.ingest/` (`provenance.json`, `report.json`).
+- Skips unchanged re-ingests by source hash; pinned to Python 3.12 for the known-good Marker/PyTorch/CUDA stack.
+- Supports `--llm no|images-only|text-only|all` and emits ordered `next_steps` (classify-system, summarize, tag, qmd refresh) when `OPENAI_API_KEY` is configured.
+- Subcommands: `ingest` (default), `classify-system`, `summarize`, `tag`, `tag-manual`, `refresh-overview`, `validate`. Full contract in `.pi/cli/book-ingest/README.md`.
 
 ### `.pi/extensions/image-gen`
 

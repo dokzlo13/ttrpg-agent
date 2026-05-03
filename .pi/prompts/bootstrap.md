@@ -94,7 +94,7 @@ If hard dependencies are missing, ask whether the user wants you to run safe ins
 Briefly explain:
 
 - `vault/` is the local Obsidian workspace. Open this folder in Obsidian; active authored prep goes under `vault/notes/`.
-- `imports/books/` stores source PDFs/EPUBs. `/ingest-book` or this bootstrap turns them into generated Markdown under `vault/library/books/`.
+- `imports/books/` stores source PDFs/EPUBs. The `ttrpg-import-book-pdf` skill (or this bootstrap) turns them into generated Markdown under `vault/library/books/`.
 - `imports/source-vault/` is an optional read-only copy of an existing/old Obsidian vault. The agent searches it only when asked and copies selected notes into `vault/notes/` on demand.
 - `imports/5etools/` is an optional local 5etools mirror for canonical creature/spell/item lookups.
 - `qmd` indexes notes/books/archive locally. Empty optional folders are OK.
@@ -203,16 +203,13 @@ If `imports/5etools/` exists but is not empty and not a valid clone, do not over
 
 Ask whether the user wants to provide books now or later. Give this disclaimer: prefer books/supplements you own or are allowed to use; do not ingest pirated material. If now, ask for paths to PDFs/EPUBs or tell the user to copy them into `imports/books/`.
 
-If books are present and the user approves ingestion, warn that large batches can take a while. Spawn the `ingest-worker` subagent for each selected PDF (sequentially unless the user explicitly asks for parallel). Brief:
+If books are present and the user approves ingestion, warn that large batches can take a while. Load the `ttrpg-import-book-pdf` skill and ingest each selected PDF sequentially (unless the user explicitly asks for parallel):
 
-```text
-Ingest imports/books/<filename>.pdf into vault/library/books/.
-Run: uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
-Use the .env Marker defaults. If CUDA was configured and the user approved tuned CUDA, add the matching --device/batch-size flags only if needed.
-Report slug, page_count, section_count, plan_source, quality_status, warnings, total time.
+```bash
+uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
 ```
 
-After ingestion, run `qmd update` and `qmd embed`. If ingestion fails due to missing Marker/OpenAI/CUDA, report the graceful fallback or config fix.
+Use the `.env` Marker defaults. If CUDA was configured and the user approved tuned CUDA, add the matching `--device`/batch-size flags only if needed. Then run every entry in the returned `next_steps` in order — that covers classify-system, summarize, tag (when `OPENAI_API_KEY` is configured) and the final `qmd update && qmd embed`. Report slug, page count, section count, plan source, status, warnings, and total time. If ingestion fails due to missing Marker/OpenAI/CUDA, report the graceful fallback or config fix.
 
 ## 6. Create local skeleton and run smoke tests
 
@@ -251,7 +248,7 @@ End with:
 - Give 3–5 example next commands tailored to what is enabled, e.g.:
   - `/find-monster goblin boss`
   - `/find-anything <term from an ingested book>`
-  - `/ingest-book imports/books/My-Book.pdf`
+  - "Ingest imports/books/My-Book.pdf" (loads `ttrpg-import-book-pdf` skill)
   - `/readaloud the party enters a candlelit sinkhole shrine`
   - `/illustrate original token portrait for a mossy undead knight`
 

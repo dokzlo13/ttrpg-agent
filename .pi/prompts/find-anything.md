@@ -37,7 +37,7 @@ isn't structured (otherwise prefer `/find-monster` or a direct `query_5etools`).
 5. **If there are no hits worth showing**, say so plainly. Suggest:
    - Different keywords (the user knows their own books better).
    - Re-running with a different mode (`search` BM25 ↔ `query` hybrid).
-   - That the relevant book may not be ingested yet (`/ingest-book`).
+   - That the relevant book may not be ingested yet (load `ttrpg-import-book-pdf`).
 
 **Don't fabricate.** "I don't see this in your library" is a valid answer.
 
