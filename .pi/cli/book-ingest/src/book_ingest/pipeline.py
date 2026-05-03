@@ -5,29 +5,25 @@ import json
 import re
 import shutil
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import click
-from pypdf import PdfReader
 
-from . import SCHEMA_VERSION
 from .config import LLMConfig
-from .marker_run import (
-    MarkerInvocation,
-    marker_version,
-    redacted_command_record,
-    run_marker,
-)
+from .converter import Converted, ConvertOptions, convert, marker_version
 from .notes import (
-    copy_referenced_images,
+    chapter_body_text,
     referenced_image_names,
-    render_book_index,
+    render_book_overview,
     render_section_note,
+    rendered_section_body,
     rewrite_image_links,
     section_filename,
     slice_pages,
+    write_referenced_images,
 )
 from .planner import book_title_from, plan_sections, slugify
 from .validate import validate_book_dir
@@ -36,11 +32,9 @@ from .validate import validate_book_dir
 @dataclass(frozen=True)
 class IngestOptions:
     output_root: Path
-    cache_root: Path
     project_root: Path
     force: bool
     dry_run: bool
-    keep_cache: bool
     keep_backup: bool
 
 
@@ -48,15 +42,19 @@ class IngestOptions:
 class IngestResult:
     status: str
     book_slug: str
+    overview_path: Path
+    chapter_dir: Path
     output_path: Path
     section_count: int
     page_count: int
     quality_status: str
     plan_source: str
-    schema_version: int
-    warnings: list[dict]
-    errors: list[dict]
-    cache_path: Path | None
+    findings: list[dict[str, Any]]
+    warnings: list[dict[str, Any]]
+    errors: list[dict[str, Any]]
+    report_path: Path
+    system: str
+    next_steps: list[dict[str, Any]]
     skipped: bool = False
 
 
@@ -68,14 +66,19 @@ def _sha256(path: Path) -> str:
     return f"sha256:{h.hexdigest()}"
 
 
+def overview_filename(book_slug: str) -> str:
+    return f"__{book_slug}.md"
+
+
 def _system_tag(text: str) -> str:
-    sample = text[:50_000]
-    hd = len(re.findall(r"\bHD\b", sample))
-    challenge = len(re.findall(r"\bChallenge\b", sample))
-    if hd >= challenge + 2:
-        return "osr"
-    if challenge >= hd + 2:
-        return "5e"
+    """Return the ingest-time system tag.
+
+    Ingest intentionally does not guess rules systems from brittle text
+    heuristics. Use `book-ingest classify-system <slug>` after ingest for the
+    metered LLM classifier, which reads bounded front/back matter evidence and
+    updates `.ingest/provenance.json` plus the overview.
+    """
+    del text
     return "unknown"
 
 
@@ -86,109 +89,121 @@ def _source_ref(pdf: Path, project_root: Path) -> str:
         return pdf.as_posix()
 
 
-def _existing_record(book_dir: Path) -> dict | None:
-    record = book_dir / ".ingest.json"
+def _provenance_path(book_dir: Path) -> Path:
+    return book_dir / ".ingest" / "provenance.json"
+
+
+def _existing_record(book_dir: Path) -> dict[str, Any] | None:
+    record = _provenance_path(book_dir)
     if not record.exists():
         return None
     try:
-        return json.loads(record.read_text(encoding="utf-8"))
+        data = json.loads(record.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
     except Exception:
         return None
 
 
-def _atomic_install(staged: Path, target: Path, force: bool) -> Path | None:
-    """Install ``staged`` to ``target``. Returns the backup path if one was created.
-
-    The backup is named with a leading dot (``.<slug>.<timestamp>.bak``) so
-    qmd's ``**/*.md`` glob skips it. Without the dot prefix, the backup
-    would be indexed as duplicate book content.
-    """
-    backup: Path | None = None
-    if target.exists():
-        if not force:
-            raise click.ClickException(f"target {target} already exists; pass --force to replace")
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        backup = target.with_name(f".{target.name}.{timestamp}.bak")
-        target.replace(backup)
+def _atomic_install_book_dir(
+    staged_dir: Path,
+    target_dir: Path,
+    *,
+    force: bool,
+) -> Path | None:
+    backup_dir: Path | None = None
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    if target_dir.exists() and not force:
+        raise click.ClickException(f"target {target_dir} already exists; pass --force to replace")
     try:
-        try:
-            staged.replace(target)
-        except OSError:
-            shutil.copytree(staged, target)
-            shutil.rmtree(staged)
+        if target_dir.exists():
+            backup_dir = target_dir.with_name(f".{target_dir.name}.{timestamp}.bak")
+            target_dir.replace(backup_dir)
+        staged_dir.replace(target_dir)
     except Exception:
-        if backup is not None and not target.exists():
-            backup.replace(target)
+        if target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+        if backup_dir is not None and backup_dir.exists():
+            backup_dir.replace(target_dir)
         raise
-    return backup
+    return backup_dir
 
 
 def _utc_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _persist_to_cache(
-    cache_dir: Path,
-    md_dir: Path,
-    json_dir: Path,
-    redacted_cmds: list[dict],
-) -> Path:
-    """Copy raw Marker artifacts into the cache directory.
-
-    Logs are written directly during ``run_marker`` (under ``cache_dir/logs``);
-    this only persists the conversion outputs and the redacted command record.
-    Existing artifact subdirs are replaced; ``logs/`` is left intact.
-    """
-    for sub in ("markdown", "json"):
-        target = cache_dir / sub
-        if target.exists():
-            shutil.rmtree(target)
-        target.mkdir(parents=True)
-    for src in md_dir.iterdir():
-        shutil.copy2(src, cache_dir / "markdown" / src.name)
-    for src in json_dir.iterdir():
-        shutil.copy2(src, cache_dir / "json" / src.name)
-    (cache_dir / "marker-cmd.json").write_text(
-        json.dumps({"runs": redacted_cmds, "marker_version": marker_version()}, indent=2),
-        encoding="utf-8",
-    )
-    return cache_dir
+def _slice_plan_body(markdown_text: str, plan: Any) -> str:
+    if getattr(plan, "char_start", None) is not None:
+        raw = markdown_text[plan.char_start : plan.char_end]
+        raw = re.sub(r"^\{\d+\}-+\s*$", "", raw, flags=re.MULTILINE)
+        return raw.strip()
+    return slice_pages(markdown_text, plan.page_start, plan.page_end)
 
 
-def _find_one(directory: Path, suffix: str) -> Path:
-    matches = sorted(p for p in directory.iterdir() if p.is_file() and p.name.endswith(suffix))
-    if not matches:
-        raise click.ClickException(f"expected a {suffix} file in {directory}")
-    return matches[0]
+def _marker_report(converted: Converted, llm: LLMConfig) -> dict[str, Any]:
+    return {
+        "duration_seconds": round(converted.duration_seconds, 3),
+        "exception": None,
+        "warnings": converted.warnings,
+        "llm": {
+            "mode": llm.mode,
+            "requested": converted.llm_calls.requested,
+            "succeeded": converted.llm_calls.succeeded,
+            "calls": converted.llm_calls.calls,
+        },
+    }
 
 
-def _agent_next_text(result: IngestResult) -> str:
-    quality_path = f"{result.output_path}/.ingest/quality.json"
-    lines = [
-        f"Wrote: {result.output_path} ({result.section_count} sections, {result.page_count} pages)",
-        f"Plan source: {result.plan_source}",
-        f"Quality: {result.quality_status} ({len(result.warnings)} warnings, {len(result.errors)} errors)",
-        "",
-        "Next:",
-        f"  1. Inspect:  cat {quality_path} | jq",
-        "  2. Index:    qmd update",
-        "  3. Embed:    qmd embed",
-    ]
-    if result.warnings:
-        lines.extend(["", "Warnings:"])
-        for w in result.warnings[:10]:
-            detail = w.get("detail") or {}
-            target = detail.get("section") or detail.get("path") or detail.get("image") or ""
-            lines.append(f"  - {w['code']}: {target}".rstrip())
-        if len(result.warnings) > 10:
-            lines.append(f"  ... ({len(result.warnings) - 10} more)")
-    return "\n".join(lines) + "\n"
+def _next_steps(result: IngestResult, *, api_key_present: bool) -> list[dict[str, Any]]:
+    steps: list[dict[str, Any]] = []
+    if result.findings:
+        steps.append(
+            {
+                "id": "review_findings",
+                "required": False,
+                "summary": _findings_summary(result.findings),
+                "report_path": str(result.report_path),
+            }
+        )
+    if api_key_present:
+        steps.extend(
+            [
+                {
+                    "id": "classify_system",
+                    "required": False,
+                    "summary": "Classify the book's rules system from bounded front/back matter evidence (metered).",
+                    "command": f"book-ingest classify-system {result.book_slug}",
+                },
+                {
+                    "id": "summarize",
+                    "required": False,
+                    "summary": "Generate detailed retrieval summaries only for chapters too long for full-text tagging (metered).",
+                    "command": f"book-ingest summarize {result.book_slug} --long-only",
+                },
+                {
+                    "id": "tag_book",
+                    "required": False,
+                    "summary": "Classify chapters with Obsidian tags; uses full text for small chapters and summaries for long ones (metered).",
+                    "command": f"book-ingest tag {result.book_slug}",
+                },
+            ]
+        )
+    steps.append({"id": "qmd_refresh", "required": True, "command": "qmd update && qmd embed"})
+    return steps
+
+
+def _findings_summary(findings: list[dict[str, Any]]) -> str:
+    counts: dict[str, int] = {}
+    for finding in findings:
+        code = str(finding.get("code", "unknown"))
+        counts[code] = counts.get(code, 0) + 1
+    return "; ".join(f"{count} {code}" for code, count in sorted(counts.items()))
 
 
 def ingest_pdf(
     pdf: Path,
     options: IngestOptions,
-    invocation: MarkerInvocation,
+    convert_options: ConvertOptions,
     llm: LLMConfig,
 ) -> IngestResult:
     if pdf.suffix.lower() != ".pdf":
@@ -196,98 +211,110 @@ def ingest_pdf(
     source_hash = _sha256(pdf)
     book_slug = slugify(pdf.stem)
     target_dir = options.output_root / book_slug
+    target_overview = target_dir / overview_filename(book_slug)
+    report_path = target_dir / ".ingest" / "report.json"
+    target_provenance = _provenance_path(target_dir)
 
     existing = _existing_record(target_dir)
+    existing_page_range = None
+    if existing:
+        existing_page_range = (existing.get("options") or {}).get("page_range")
     if (
         existing
         and existing.get("source_hash") == source_hash
-        and existing.get("schema_version") == SCHEMA_VERSION
+        and existing_page_range == convert_options.page_range
+        and target_overview.exists()
+        and target_provenance.exists()
         and not options.force
     ):
-        click.echo(f"skip {pdf.name}: hash + schema match existing ingest", err=True)
-        return IngestResult(
+        click.echo(f"skip {pdf.name}: source hash matches existing ingest", err=True)
+        result = IngestResult(
             status="skipped",
             book_slug=book_slug,
+            overview_path=target_overview,
+            chapter_dir=target_dir,
             output_path=target_dir,
             section_count=int(existing.get("section_count", 0)),
             page_count=int(existing.get("page_count", 0)),
             quality_status=str(existing.get("quality_status", "unknown")),
             plan_source=str(existing.get("plan_source", "unknown")),
-            schema_version=int(existing.get("schema_version", 0)),
+            findings=[],
             warnings=[],
             errors=[],
-            cache_path=None,
+            report_path=report_path,
+            system=str(existing.get("system", "unknown")),
+            next_steps=[],
             skipped=True,
         )
-
-    if existing and existing.get("schema_version", 0) != SCHEMA_VERSION and not options.force:
-        click.echo(
-            f"schema_version mismatch on {target_dir.name} "
-            f"({existing.get('schema_version')} → {SCHEMA_VERSION}); auto-forcing re-ingest",
-            err=True,
-        )
+        result.next_steps = _next_steps(result, api_key_present=bool(llm.api_key))
+        return result
 
     if options.dry_run:
-        click.echo(f"would ingest {pdf} -> {target_dir}", err=True)
-        return IngestResult(
+        click.echo(f"would ingest {pdf} -> {target_dir} + {target_overview}", err=True)
+        result = IngestResult(
             status="dry-run",
             book_slug=book_slug,
+            overview_path=target_overview,
+            chapter_dir=target_dir,
             output_path=target_dir,
             section_count=0,
             page_count=0,
             quality_status="unknown",
             plan_source="unknown",
-            schema_version=SCHEMA_VERSION,
+            findings=[],
             warnings=[],
             errors=[],
-            cache_path=None,
+            report_path=report_path,
+            system="unknown",
+            next_steps=[],
         )
+        result.next_steps = _next_steps(result, api_key_present=bool(llm.api_key))
+        return result
 
     options.output_root.mkdir(parents=True, exist_ok=True)
-    options.cache_root.mkdir(parents=True, exist_ok=True)
     ingested_at = _utc_iso()
-
-    cache_dir = options.cache_root / source_hash.replace(":", "-")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    log_dir = cache_dir / "logs"
 
     with tempfile.TemporaryDirectory(prefix=f"book-ingest-{book_slug}-") as td:
         scratch = Path(td)
-        md_run = run_marker(pdf, scratch, "markdown", invocation, log_dir=log_dir)
-        json_run = run_marker(pdf, scratch, "json", invocation, log_dir=log_dir)
-        marker_md_dir = md_run.output_dir
-        marker_json_dir = json_run.output_dir
-        markdown_path = _find_one(marker_md_dir, ".md")
-        json_path = _find_one(marker_json_dir, ".json")
+        converted = convert(pdf, convert_options)
+        markdown_text = converted.markdown
+        page_count = len(converted.page_stats)
+        if page_count == 0:
+            page_count = max((p.get("page_id", -1) for p in converted.page_stats), default=-1) + 1
 
-        markdown_text = markdown_path.read_text(encoding="utf-8", errors="replace")
-        try:
-            page_count = len(PdfReader(str(pdf)).pages)
-        except Exception:
-            page_count = 0
-
-        pdf_metadata: dict[str, str] = {}
-        try:
-            raw_meta: dict = dict(PdfReader(str(pdf)).metadata or {})
-            pdf_metadata = {str(k): str(v) for k, v in raw_meta.items()}
-        except Exception:
-            pdf_metadata = {}
-
-        book_title = book_title_from(pdf, pdf_metadata)
-        plans, plan_source = plan_sections(pdf, json_path, page_count, book_title)
+        book_title = book_title_from(pdf)
+        plans, plan_source = plan_sections(
+            pdf, converted.table_of_contents, page_count, book_title, markdown_text
+        )
         system = _system_tag(markdown_text)
         source_ref = _source_ref(pdf, options.project_root)
 
-        staged_dir = scratch / "staged" / book_slug
+        staged_root = scratch / "staged"
+        staged_dir = staged_root / book_slug
+        staged_overview = staged_dir / overview_filename(book_slug)
         staged_dir.mkdir(parents=True, exist_ok=True)
         target_images = staged_dir / "images"
 
-        all_referenced: set[str] = set()
+        section_inputs: list[tuple[Any, str]] = []
+        omitted_empty_sections: list[dict[str, Any]] = []
         for plan in plans:
-            raw_body = slice_pages(markdown_text, plan.page_start, plan.page_end)
-            referenced = referenced_image_names(raw_body)
-            all_referenced |= referenced
+            raw_body = _slice_plan_body(markdown_text, plan)
             rewritten = rewrite_image_links(raw_body)
+            if not rendered_section_body(rewritten, plan.title):
+                omitted_empty_sections.append(
+                    {"section": plan.slug, "title": plan.title, "index": plan.index}
+                )
+                continue
+            section_inputs.append((plan, rewritten))
+        if not section_inputs:
+            raise click.ClickException(f"no non-empty sections extracted from {pdf}")
+        plans = [replace(plan, index=i) for i, (plan, _) in enumerate(section_inputs, start=1)]
+        section_inputs = [(plans[i], body) for i, (_, body) in enumerate(section_inputs)]
+
+        all_referenced: set[str] = set()
+        for plan, rewritten in section_inputs:
+            referenced = referenced_image_names(rewritten)
+            all_referenced |= referenced
             note = render_section_note(
                 plan=plan,
                 plans=plans,
@@ -299,9 +326,9 @@ def ingest_pdf(
             )
             (staged_dir / section_filename(plan)).write_text(note, encoding="utf-8")
 
-        _, missing = copy_referenced_images(marker_md_dir, target_images, all_referenced)
+        _, missing = write_referenced_images(converted.images, target_images, all_referenced)
 
-        book_index = render_book_index(
+        book_overview = render_book_overview(
             book_title=book_title,
             book_slug=book_slug,
             plans=plans,
@@ -311,139 +338,123 @@ def ingest_pdf(
             page_count=page_count,
             plan_source=plan_source,
         )
-        (staged_dir / "_book.md").write_text(book_index, encoding="utf-8")
+        staged_overview.write_text(book_overview, encoding="utf-8")
 
         ingest_dir = staged_dir / ".ingest"
         ingest_dir.mkdir(parents=True, exist_ok=True)
-        manifest = {
-            "schema_version": SCHEMA_VERSION,
-            "book_slug": book_slug,
-            "book_title": book_title,
-            "page_count": page_count,
-            "plan_source": plan_source,
-            "sections": [asdict(p) for p in plans],
-        }
-        (ingest_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        redacted_runs = [
-            redacted_command_record(
-                pdf,
-                "markdown",
-                invocation,
-                log_path=md_run.log_path,
-                duration_seconds=md_run.duration_seconds,
-                returncode=md_run.returncode,
-            ),
-            redacted_command_record(
-                pdf,
-                "json",
-                invocation,
-                log_path=json_run.log_path,
-                duration_seconds=json_run.duration_seconds,
-                returncode=json_run.returncode,
-            ),
-        ]
-        (ingest_dir / "marker.json").write_text(
-            json.dumps({"runs": redacted_runs}, indent=2), encoding="utf-8"
-        )
-
-        quality = validate_book_dir(staged_dir, plans=plans)
-        if missing:
-            for name in sorted(missing):
-                quality["warnings"].append(
-                    {
-                        "code": "missing_source_image",
-                        "severity": "warning",
-                        "detail": {"image": name},
-                    }
+        marker = _marker_report(converted, llm)
+        stats = {
+            "sections": len(plans),
+            "pages": page_count,
+            "images_extracted": len(converted.images),
+            "sections_omitted_empty": len(omitted_empty_sections),
+            "omitted_empty_sections": omitted_empty_sections,
+            "chars_total": sum(
+                len(
+                    chapter_body_text(
+                        (staged_dir / section_filename(plan)).read_text(encoding="utf-8")
+                    )
                 )
-            if quality["status"] == "ok":
-                quality["status"] = "review_required"
-
-        if invocation.llm.enabled and not invocation.llm.api_key:
-            quality["warnings"].append(
-                {
-                    "code": "marker_llm_requested_but_skipped",
-                    "severity": "warning",
-                    "detail": {"reason": "missing api key"},
-                }
-            )
-            if quality["status"] == "ok":
-                quality["status"] = "review_required"
-
-        (ingest_dir / "quality.json").write_text(json.dumps(quality, indent=2), encoding="utf-8")
+                for plan in plans
+            ),
+        }
+        extra_findings = [
+            {
+                "code": "missing_source_image",
+                "severity": "warning",
+                "detail": {"image": name},
+            }
+            for name in sorted(missing)
+        ]
+        report = validate_book_dir(
+            staged_dir,
+            plans=plans,
+            overview_path=staged_overview,
+            marker=marker,
+            stats=stats,
+            extra_findings=extra_findings,
+        )
+        (ingest_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
         provenance = {
-            "schema_version": SCHEMA_VERSION,
             "book_slug": book_slug,
             "book_title": book_title,
             "source_pdf": source_ref,
             "source_hash": source_hash,
             "ingested_at": ingested_at,
-            "engine": "marker",
+            "engine": "marker-sdk",
             "engine_version": marker_version(),
             "page_count": page_count,
             "section_count": len(plans),
+            "sections_omitted_empty": len(omitted_empty_sections),
+            "omitted_empty_sections": omitted_empty_sections,
             "plan_source": plan_source,
             "system": system,
-            "quality_status": quality["status"],
+            "systems": [] if system == "unknown" else [system],
+            "quality_status": report["status"],
+            "llm": llm.redacted(),
             "options": {
-                "device": invocation.device,
-                "workers": invocation.workers,
-                "page_range": invocation.page_range,
-                "force_ocr": invocation.force_ocr,
+                "device": convert_options.device,
+                "device_source": convert_options.device_source,
+                "page_range": convert_options.page_range,
+                "page_range_source": convert_options.page_range_source,
+                "force_ocr": convert_options.force_ocr,
+                "force_ocr_source": convert_options.force_ocr_source,
                 "batch_sizes": {
-                    "layout": invocation.layout_batch_size,
-                    "detection": invocation.detection_batch_size,
-                    "recognition": invocation.recognition_batch_size,
-                    "table_rec": invocation.table_rec_batch_size,
+                    "layout": convert_options.layout_batch_size,
+                    "detection": convert_options.detection_batch_size,
+                    "recognition": convert_options.recognition_batch_size,
+                    "table_rec": convert_options.table_rec_batch_size,
                 },
-                "llm": invocation.llm.redacted(),
+                "batch_size_sources": convert_options.batch_size_sources,
+                "torch": {
+                    "cuda_available": convert_options.torch_cuda_available,
+                    "cuda_device": convert_options.torch_cuda_device,
+                },
             },
         }
-        (staged_dir / ".ingest.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+        (ingest_dir / "provenance.json").write_text(
+            json.dumps(provenance, indent=2), encoding="utf-8"
+        )
 
+        findings = list(report["findings"])
+        warnings_ = [f for f in findings if f.get("severity") == "warning"]
+        errors = [f for f in findings if f.get("severity") == "error"]
         result = IngestResult(
-            status="ok" if quality["status"] != "failed" else "failed",
+            status=report["status"],
             book_slug=book_slug,
+            overview_path=target_overview,
+            chapter_dir=target_dir,
             output_path=target_dir,
             section_count=len(plans),
             page_count=page_count,
-            quality_status=quality["status"],
+            quality_status=report["status"],
             plan_source=plan_source,
-            schema_version=SCHEMA_VERSION,
-            warnings=list(quality["warnings"]),
-            errors=list(quality["errors"]),
-            cache_path=None,
+            findings=findings,
+            warnings=warnings_,
+            errors=errors,
+            report_path=report_path,
+            system=system,
+            next_steps=[],
         )
+        result.next_steps = _next_steps(result, api_key_present=bool(llm.api_key))
 
-        if options.keep_cache:
-            _persist_to_cache(cache_dir, marker_md_dir, marker_json_dir, redacted_runs)
-            result.cache_path = cache_dir
-        else:
-            # Default policy: drop the heavy markdown/json artifacts (the
-            # canonical content lives under vault/library/books/<slug>/),
-            # keep only logs/ for an audit trail. Pass --keep-cache to retain.
-            for sub in ("markdown", "json"):
-                shutil.rmtree(cache_dir / sub, ignore_errors=True)
-            (cache_dir / "marker-cmd.json").unlink(missing_ok=True)
-            if (cache_dir / "logs").exists():
-                result.cache_path = cache_dir
-
-        (ingest_dir / "agent-next.txt").write_text(_agent_next_text(result), encoding="utf-8")
-
-        if quality["status"] == "failed":
+        if report["status"] == "failed":
             click.echo(
                 f"validation failed for {pdf.name}; staged output kept under {staged_dir}", err=True
             )
             return result
 
-        backup = _atomic_install(
-            staged_dir, target_dir, force=options.force or (existing is not None)
+        backup_dir = _atomic_install_book_dir(
+            staged_dir,
+            target_dir,
+            force=options.force or (existing is not None),
         )
-        if backup is not None and not options.keep_backup:
-            shutil.rmtree(backup, ignore_errors=True)
-        elif backup is not None:
-            click.echo(f"previous output preserved at {backup}", err=True)
+        if not options.keep_backup:
+            if backup_dir is not None:
+                shutil.rmtree(backup_dir, ignore_errors=True)
+        elif backup_dir is not None:
+            click.echo(f"previous chapter dir preserved at {backup_dir}", err=True)
 
     return result

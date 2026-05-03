@@ -2,8 +2,11 @@ import pytest
 
 from book_ingest.models import SectionPlan
 from book_ingest.notes import (
+    body_hash_of,
+    chapter_body_text,
     referenced_image_names,
-    render_book_index,
+    reformat_image_descriptions,
+    render_book_overview,
     render_section_note,
     rewrite_image_links,
     section_filename,
@@ -73,8 +76,16 @@ def test_rewrite_image_links(body, expected):
 
 
 def test_referenced_image_names_collects_filenames():
-    body = "![](_page_4_Picture_1.jpeg)\n![](_page_5_Figure_2.png)\n"
+    body = "![](_page_4_Picture_1.jpeg)\n![](images/_page_5_Figure_2.png)\n"
     assert referenced_image_names(body) == {"_page_4_Picture_1.jpeg", "_page_5_Figure_2.png"}
+
+
+def test_reformat_image_descriptions_as_callouts():
+    body = "Text\n\nImage /page/6/Picture/2 description: A cabin in trees.\n\n![](images/_page_6_Picture_2.jpeg)"
+    out = reformat_image_descriptions(body)
+    assert "Image /page" not in out
+    assert "> [!image] AI description" in out
+    assert "> A cabin in trees." in out
 
 
 @pytest.mark.parametrize(
@@ -95,7 +106,7 @@ def _plan(idx, title, slug, ps, pe):
     return SectionPlan(index=idx, title=title, slug=slug, page_start=ps, page_end=pe, source="test")
 
 
-def test_render_section_note_includes_navigation():
+def test_render_section_note_uses_body_then_footer_navigation():
     plans = [
         _plan(1, "Intro", "intro", 0, 1),
         _plan(2, "Mid", "mid", 2, 3),
@@ -112,11 +123,22 @@ def test_render_section_note_includes_navigation():
     )
     assert "section: Mid" in out
     assert "section_index: 2" in out
-    assert "page_start: 3" in out  # 1-based in the rendered note
-    assert "[[01-intro|Intro]]" in out
-    assert "[[03-end|End]]" in out
-    assert "## Text" in out
-    assert "Some body text." in out
+    assert "page_start: 3" in out
+    assert "body_hash: sha256:" in out
+    assert "Book:" not in out
+    assert "[[library/books/sample-book/01-intro|Intro]]" in out
+    assert "[[library/books/sample-book/03-end|End]]" in out
+    assert "## Text" not in out
+    assert "# Mid\n\nSome body text.\n\n---" in out
+    assert body_hash_of(out) in out
+
+
+def test_chapter_body_text_extracts_current_body_without_footer():
+    text = (
+        "---\na: b\n---\n\n# Title\n\nBody\n\n---\n\n"
+        "Previous: [[library/books/book/01-intro|Intro]]\nPages: 2"
+    )
+    assert chapter_body_text(text) == "Body"
 
 
 def test_render_section_note_marks_empty_body():
@@ -133,12 +155,12 @@ def test_render_section_note_marks_empty_body():
     assert "_(no text extracted" in out
 
 
-def test_render_book_index_lists_sections():
+def test_render_book_overview_lists_sections_with_full_vault_links_and_toc_metadata():
     plans = [
         _plan(1, "Intro", "intro", 0, 0),
         _plan(2, "Mid", "mid", 1, 3),
     ]
-    out = render_book_index(
+    out = render_book_overview(
         book_title="Sample Book",
         book_slug="sample-book",
         plans=plans,
@@ -146,13 +168,20 @@ def test_render_book_index_lists_sections():
         ingested_at="2026-01-01T00:00:00Z",
         system="osr",
         page_count=10,
-        plan_source="pdf-outline",
+        plan_source="marker-toc",
+        summaries={"02-mid": "Middle summary."},
+        tags={"02-mid": ["location"]},
     )
-    assert "[[01-intro|Intro]]" in out
-    assert "[[02-mid|Mid]]" in out
+    assert "[[library/books/sample-book/01-intro|Intro]]" in out
+    assert (
+        "[[library/books/sample-book/02-mid|Mid]] — pp. 2–4 — Middle summary. — [location]" in out
+    )
     assert "p. 1" in out
-    assert "pp. 2–4" in out
     assert "system: osr" in out
+    assert "summary: Book Sample Book table of contents." in out
+    assert "toc" in out
+    assert "body_hash: sha256:" in out
+    assert "tags_for: sha256:" in out
 
 
 def test_section_filename_format():

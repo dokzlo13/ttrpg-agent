@@ -1,12 +1,13 @@
 [project]
 name = "book-ingest"
-version = "0.2.0"
+version = "0.3.0"
 description = "Convert TTRPG PDFs into chunked, frontmattered Markdown via Marker."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "click>=8.1",
-    "pypdf>=4.0",
+    "marker-pdf>=1.10.2,<2",
+    "openai>=1.0",
     "pyyaml>=6.0",
 ]
 
@@ -83,7 +84,7 @@ show_column_numbers = true
 pretty = true
 
 [[tool.mypy.overrides]]
-module = ["pypdf", "pypdf.*", "yaml", "click"]
+module = ["yaml", "click", "marker.*", "openai"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -14,16 +14,6 @@ def find_project_root(start: Path | None = None) -> Path:
     return Path.cwd().resolve()
 
 
-def default_cache_root(project_root: Path) -> Path:
-    """Return ``<project_root>/.cache/book-ingest``.
-
-    Project-local cache, gitignored. Matches the convention used by
-    ``.pytest_cache``, ``.mypy_cache``, etc., and keeps the cache
-    project-scoped so multiple checkouts don't share state.
-    """
-    return (project_root / ".cache" / "book-ingest").resolve()
-
-
 _DOTENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
 
 
@@ -53,21 +43,7 @@ def load_dotenv_into(env: dict[str, str], dotenv_path: Path) -> None:
         env.setdefault(k, v)
 
 
-_TRUTHY = {"1", "true", "yes", "on"}
-_FALSY = {"0", "false", "no", "off", ""}
 LLM_MODES = {"no", "all", "images-only", "text-only"}
-
-
-def parse_bool_env(value: str | None) -> bool | None:
-    """Parse env-style boolean. Returns None when value is unset/unparseable so callers can fall through."""
-    if value is None:
-        return None
-    s = value.strip().lower()
-    if s in _TRUTHY:
-        return True
-    if s in _FALSY:
-        return False
-    return None
 
 
 def parse_positive_int_env(value: str | None, *, default: int) -> int:
@@ -84,12 +60,15 @@ def parse_positive_int_env(value: str | None, *, default: int) -> int:
 @dataclass(frozen=True)
 class LLMConfig:
     enabled: bool
-    enabled_source: str  # "cli" | "env" | "default" | legacy/implied variants
+    enabled_source: str  # "cli" | "env" | "default"
     api_key: str | None
     model: str
     base_url: str
     mode: str = "all"  # no | all | images-only | text-only
     max_concurrency: int = 2
+    model_source: str = "default"
+    base_url_source: str = "default"
+    max_concurrency_source: str = "default"
 
     def redacted(self) -> dict:
         return {
@@ -97,89 +76,32 @@ class LLMConfig:
             "use_llm": self.enabled,
             "use_llm_source": self.enabled_source,
             "openai_model": self.model,
+            "openai_model_source": self.model_source,
             "openai_base_url": self.base_url,
+            "openai_base_url_source": self.base_url_source,
             "openai_api_key_present": bool(self.api_key),
             "max_concurrency": self.max_concurrency,
+            "max_concurrency_source": self.max_concurrency_source,
         }
 
 
-def resolve_tristate(
-    cli_value: bool | None, env_value: str | None, default: bool = False
-) -> tuple[bool, str]:
-    """Resolve a CLI > env > default boolean. Returns (value, source)."""
-    if cli_value is not None:
-        return cli_value, "cli"
-    parsed = parse_bool_env(env_value)
-    if parsed is not None:
-        return parsed, "env"
-    return default, "default"
-
-
 def parse_llm_mode(value: str | None) -> str | None:
-    """Parse the LLM mode enum, accepting boolean-ish aliases for env ergonomics."""
+    """Parse the LLM mode enum."""
     if value is None:
         return None
     s = value.strip().lower().replace("_", "-")
-    aliases = {
-        "off": "no",
-        "false": "no",
-        "0": "no",
-        "none": "no",
-        "on": "all",
-        "true": "all",
-        "1": "all",
-        "yes": "all",
-        "image-only": "images-only",
-        "images": "images-only",
-        "image": "images-only",
-        "text": "text-only",
-    }
-    s = aliases.get(s, s)
     if s in LLM_MODES:
         return s
     return None
 
 
-def resolve_llm_mode(
-    *,
-    cli_llm_mode: str | None,
-    cli_use_llm: bool | None,
-    cli_describe_images: bool | None,
-    env: dict[str, str],
-) -> tuple[str, str]:
-    """Resolve LLM behavior.
-
-    New style is ``--llm`` / ``TTRPG_MARKER_LLM_MODE`` with modes:
-    ``no``, ``all``, ``images-only``, ``text-only``.
-
-    Legacy ``--use-llm`` and ``--describe-images`` are still accepted.  They
-    map to the closest explicit mode while preserving CLI-over-env precedence.
-    """
+def resolve_llm_mode(*, cli_llm_mode: str | None, env: dict[str, str]) -> tuple[str, str]:
+    """Resolve LLM behavior from ``--llm`` / ``TTRPG_MARKER_LLM_MODE`` only."""
     parsed_cli_mode = parse_llm_mode(cli_llm_mode)
     if cli_llm_mode is not None:
         if parsed_cli_mode is None:
             raise ValueError(f"invalid llm mode: {cli_llm_mode}")
         return parsed_cli_mode, "cli"
-
-    # Legacy CLI flags win over environment defaults.
-    if cli_use_llm is not None or cli_describe_images is not None:
-        if cli_use_llm is False and cli_describe_images is True:
-            raise ValueError("--no-use-llm conflicts with --describe-images")
-        if cli_use_llm is False:
-            return "no", "cli-legacy"
-
-        if cli_describe_images is not None:
-            describe = cli_describe_images
-        else:
-            describe = parse_bool_env(env.get("TTRPG_MARKER_DESCRIBE_IMAGES")) or False
-
-        if cli_use_llm is True:
-            return ("all" if describe else "text-only"), "cli-legacy"
-        if describe:
-            return "images-only", "cli-legacy"
-        # --no-describe-images alone: keep env use_llm if present, but force no image captions.
-        env_use = parse_bool_env(env.get("TTRPG_MARKER_USE_LLM"))
-        return ("text-only" if env_use else "no"), "cli-legacy"
 
     env_mode = parse_llm_mode(env.get("TTRPG_MARKER_LLM_MODE"))
     if env.get("TTRPG_MARKER_LLM_MODE") is not None:
@@ -187,20 +109,11 @@ def resolve_llm_mode(
             raise ValueError(f"invalid TTRPG_MARKER_LLM_MODE: {env.get('TTRPG_MARKER_LLM_MODE')}")
         return env_mode, "env"
 
-    env_use = parse_bool_env(env.get("TTRPG_MARKER_USE_LLM"))
-    env_describe = parse_bool_env(env.get("TTRPG_MARKER_DESCRIBE_IMAGES"))
-    if env_use is True:
-        return ("all" if env_describe else "text-only"), "env-legacy"
-    if env_describe is True:
-        return "images-only", "env-legacy"
-    if env_use is False or env_describe is False:
-        return "no", "env-legacy"
     return "no", "default"
 
 
 def resolve_llm_config(
     *,
-    cli_use_llm: bool | None,
     cli_model: str | None,
     cli_base_url: str | None,
     env: dict[str, str],
@@ -210,29 +123,38 @@ def resolve_llm_config(
     """Resolve LLM config with precedence: CLI > env > default.
 
     ``.env`` values are expected to have been merged into ``env`` already.
-    New callers should pass ``llm_mode`` from :func:`resolve_llm_mode`.
-    Legacy callers can still pass ``cli_use_llm``.
+    Callers should pass ``llm_mode`` from :func:`resolve_llm_mode`.
     """
-    if llm_mode is not None:
-        mode = parse_llm_mode(llm_mode)
-        if mode is None:
-            raise ValueError(f"invalid llm mode: {llm_mode}")
-        enabled = mode != "no"
-        enabled_source = llm_mode_source or "cli"
-    else:
-        enabled, enabled_source = resolve_tristate(
-            cli_use_llm, env.get("TTRPG_MARKER_USE_LLM"), default=False
-        )
-        mode = "all" if enabled else "no"
+    mode = parse_llm_mode(llm_mode)
+    if mode is None:
+        raise ValueError(f"invalid llm mode: {llm_mode}")
+    enabled = mode != "no"
+    enabled_source = llm_mode_source or "cli"
 
     api_key = env.get("OPENAI_API_KEY") or None
-    model = cli_model or env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-4o-mini"
-    base_url = (
-        cli_base_url or env.get("TTRPG_MARKER_OPENAI_BASE_URL") or "https://api.openai.com/v1"
-    )
-    max_concurrency = parse_positive_int_env(
-        env.get("TTRPG_MARKER_LLM_MAX_CONCURRENCY"), default=2
-    )
+    if cli_model:
+        model = cli_model
+        model_source = "cli"
+    elif env.get("TTRPG_MARKER_OPENAI_MODEL"):
+        model = env["TTRPG_MARKER_OPENAI_MODEL"]
+        model_source = "env"
+    else:
+        model = "gpt-4o-mini"
+        model_source = "default"
+
+    if cli_base_url:
+        base_url = cli_base_url
+        base_url_source = "cli"
+    elif env.get("TTRPG_MARKER_OPENAI_BASE_URL"):
+        base_url = env["TTRPG_MARKER_OPENAI_BASE_URL"]
+        base_url_source = "env"
+    else:
+        base_url = "https://api.openai.com/v1"
+        base_url_source = "default"
+
+    max_concurrency_env = env.get("TTRPG_MARKER_LLM_MAX_CONCURRENCY")
+    max_concurrency = parse_positive_int_env(max_concurrency_env, default=2)
+    max_concurrency_source = "env" if max_concurrency_env else "default"
     return LLMConfig(
         enabled=enabled,
         enabled_source=enabled_source,
@@ -241,6 +163,9 @@ def resolve_llm_config(
         base_url=base_url,
         mode=mode,
         max_concurrency=max_concurrency,
+        model_source=model_source,
+        base_url_source=base_url_source,
+        max_concurrency_source=max_concurrency_source,
     )
 
 

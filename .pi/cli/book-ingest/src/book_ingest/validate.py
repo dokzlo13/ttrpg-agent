@@ -4,14 +4,13 @@ import json
 import re
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from .models import QualityFinding, SectionPlan
-from .notes import section_filename
-from .planner import looks_like_ocr_noise
+from .notes import chapter_body_text, read_chapter, section_filename
+from .planner import looks_like_ocr_noise, slugify
 
 _LOCAL_IMAGE = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
-
-
 _OVERSIZED_BYTES = 200_000
 _TINY_BYTES = 200
 
@@ -20,22 +19,67 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
 
 
-def validate_book_dir(book_dir: Path, plans: list[SectionPlan] | None = None) -> dict:
-    """Validate an ingested book directory. Returns a JSON-serializable quality report."""
-    findings: list[QualityFinding] = []
+def default_marker_report() -> dict[str, Any]:
+    return {
+        "duration_seconds": 0.0,
+        "exception": None,
+        "warnings": [],
+        "llm": {"mode": "no", "requested": 0, "succeeded": 0, "calls": []},
+    }
 
-    manifest_path = book_dir / ".ingest" / "manifest.json"
-    if plans is None:
-        if manifest_path.exists():
-            data = json.loads(_read(manifest_path))
-            plans = [SectionPlan(**s) for s in data.get("sections", [])]
-        else:
-            plans = []
-            findings.append(
-                QualityFinding(
-                    code="manifest_missing", severity="error", detail={"path": str(manifest_path)}
-                )
+
+def read_existing_marker_report(book_dir: Path) -> dict[str, Any]:
+    report_path = book_dir / ".ingest" / "report.json"
+    if not report_path.exists():
+        return default_marker_report()
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception:
+        return default_marker_report()
+    marker = data.get("marker")
+    return marker if isinstance(marker, dict) else default_marker_report()
+
+
+def plans_from_chapters(book_dir: Path) -> list[SectionPlan]:
+    plans: list[SectionPlan] = []
+    for path in sorted(book_dir.glob("*.md")):
+        if path.name.startswith((".", "__")):
+            continue
+        fm, _ = read_chapter(path)
+        if not fm:
+            continue
+        title = str(fm.get("section") or path.stem)
+        index = int(fm.get("section_index") or _index_from_name(path) or len(plans) + 1)
+        page_start = int(fm.get("page_start") or 1) - 1
+        page_end = int(fm.get("page_end") or page_start + 1) - 1
+        stem_slug = re.sub(r"^\d+-", "", path.stem)
+        plans.append(
+            SectionPlan(
+                index=index,
+                title=title,
+                slug=stem_slug or slugify(title),
+                page_start=page_start,
+                page_end=page_end,
+                source="chapter-frontmatter",
             )
+        )
+    return sorted(plans, key=lambda p: p.index)
+
+
+def validate_book_dir(
+    book_dir: Path,
+    plans: list[SectionPlan] | None = None,
+    *,
+    overview_path: Path | None = None,
+    marker: dict[str, Any] | None = None,
+    stats: dict[str, Any] | None = None,
+    extra_findings: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Validate an ingested book directory and return the current report."""
+    findings: list[QualityFinding] = []
+    plans = plans if plans is not None else plans_from_chapters(book_dir)
+    overview_path = overview_path or (book_dir / f"__{book_dir.name}.md")
+    marker = marker or default_marker_report()
 
     seen_slugs: dict[str, int] = {}
     last_page_end = -1
@@ -52,10 +96,8 @@ def validate_book_dir(book_dir: Path, plans: list[SectionPlan] | None = None) ->
             )
             continue
 
-        body = _read(path)
-        without_frontmatter = re.sub(r"^---.*?---\n+", "", body, count=1, flags=re.DOTALL)
-        parts = re.split(r"^## Text\s*$", without_frontmatter, maxsplit=1, flags=re.MULTILINE)
-        body_only = parts[1] if len(parts) > 1 else parts[0]
+        text = _read(path)
+        body_only = chapter_body_text(text)
         size = len(body_only.strip())
 
         if size == 0 or "_(no text extracted" in body_only:
@@ -114,7 +156,7 @@ def validate_book_dir(book_dir: Path, plans: list[SectionPlan] | None = None) ->
             )
         last_page_end = max(last_page_end, plan.page_end)
 
-        for m in _LOCAL_IMAGE.finditer(body):
+        for m in _LOCAL_IMAGE.finditer(text):
             href = m.group(1)
             target = book_dir / href
             if not target.exists():
@@ -126,16 +168,73 @@ def validate_book_dir(book_dir: Path, plans: list[SectionPlan] | None = None) ->
                     )
                 )
 
-    if not (book_dir / "_book.md").exists():
+    if not overview_path.exists():
         findings.append(
-            QualityFinding(code="book_index_missing", severity="error", detail={"path": "_book.md"})
+            QualityFinding(
+                code="book_index_missing", severity="error", detail={"path": str(overview_path)}
+            )
+        )
+
+    marker_exception = marker.get("exception") if isinstance(marker, dict) else None
+    if marker_exception:
+        findings.append(
+            QualityFinding(code="marker_exception", severity="error", detail=marker_exception)
+        )
+    marker_warnings = marker.get("warnings") if isinstance(marker, dict) else []
+    if marker_warnings:
+        findings.append(
+            QualityFinding(
+                code="marker_warnings",
+                severity="warning",
+                detail={"count": len(marker_warnings), "warnings": marker_warnings[:10]},
+            )
+        )
+    llm = marker.get("llm", {}) if isinstance(marker, dict) else {}
+    calls = llm.get("calls", []) if isinstance(llm, dict) else []
+    failed = sum(1 for call in calls if call.get("status") == "failed")
+    if failed:
+        findings.append(
+            QualityFinding(
+                code="llm_calls_failed",
+                severity="warning",
+                detail={"failed": failed, "of": len(calls)},
+            )
+        )
+
+    for finding in extra_findings or []:
+        findings.append(
+            QualityFinding(
+                code=str(finding.get("code")),
+                severity=str(finding.get("severity", "warning")),
+                detail=dict(finding.get("detail") or {}),
+            )
         )
 
     errors = [f for f in findings if f.severity == "error"]
-    warnings_ = [f for f in findings if f.severity == "warning"]
-    status = "failed" if errors else ("review_required" if warnings_ else "ok")
+    status = "failed" if errors else ("review" if findings else "ok")
     return {
         "status": status,
-        "errors": [asdict(f) for f in errors],
-        "warnings": [asdict(f) for f in warnings_],
+        "marker": marker,
+        "findings": [asdict(f) for f in findings],
+        "stats": stats or _stats_from_book_dir(book_dir, plans),
     }
+
+
+def _stats_from_book_dir(book_dir: Path, plans: list[SectionPlan]) -> dict[str, Any]:
+    chars_total = 0
+    for path in book_dir.glob("*.md"):
+        if not path.name.startswith((".", "__")):
+            chars_total += len(chapter_body_text(_read(path)))
+    return {
+        "sections": len(plans),
+        "pages": max((p.page_end for p in plans), default=-1) + 1,
+        "images_extracted": len(list((book_dir / "images").glob("*")))
+        if (book_dir / "images").exists()
+        else 0,
+        "chars_total": chars_total,
+    }
+
+
+def _index_from_name(path: Path) -> int | None:
+    m = re.match(r"^(\d+)-", path.stem)
+    return int(m.group(1)) if m else None
