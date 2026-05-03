@@ -56,10 +56,17 @@ export GGML_CUDA_NO_VMM="${GGML_CUDA_NO_VMM:-1}"
 
 mkdir -p \
   "$QMD_CONFIG_DIR" \
+  "$QMD_CONFIG_DIR/datalab/models" \
+  "$QMD_CONFIG_DIR/qmd/models" \
+  "$QMD_CONFIG_DIR/uv" \
+  "$TTRPG_IMPORTS_DIR/fvtt-data" \
   "$TTRPG_BOOKS_DIR" \
   "$TTRPG_SOURCE_VAULT_DIR" \
   "$TTRPG_5ETOOLS_DIR" \
   "$TTRPG_NOTES_DIR" \
+  "$TTRPG_NOTES_DIR/images" \
+  "$PROJECT_ROOT/vault/notes/mechanics" \
+  "$PROJECT_ROOT/vault/notes/readalouds" \
   "$TTRPG_LIBRARY_DIR"
 
 _pi_qmd_collection_path() {

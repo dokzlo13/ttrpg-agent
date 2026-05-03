@@ -299,7 +299,7 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 
 Tracked by git:
 
-- `README.md`, `AGENTS.md`, `.env.example`, `.gitignore`, empty local-data `.gitkeep` placeholders
+- `README.md`, `AGENTS.md`, `.env.example`, `.gitignore`
 - `.pi/settings.json`
 - `.pi/skills/`, `.pi/prompts/`, `.pi/agents/`, `.pi/extensions/`
 - `.pi/scripts/`
@@ -308,8 +308,8 @@ Tracked by git:
 Ignored/local:
 
 - `.env`, `.env.*` except `.env.example`
-- `vault/` contents — Obsidian vault, active campaign notes, generated images, ingested book output. Empty skeleton directories are kept with `.gitkeep`.
-- `imports/` contents — source PDFs, legacy vault, 5etools clone. Empty import directories are kept with `.gitkeep` except `imports/5etools/`, which must remain clone-friendly.
+- `vault/` — Obsidian vault, active campaign notes, generated images, ingested book output. This may be a real local directory or a symlink to a Windows-accessible vault.
+- `imports/` — source PDFs, legacy vault, Foundry exports, 5etools clone, and other local inputs.
 - `.qmd/` — qmd config/cache/index/model state
 - `.cache/`, `.trash/`, test caches, virtualenvs, node_modules
 - `.pi/npm/`, `.pi/git/`, `.pi-home/` — project-local pi runtime/package caches
@@ -325,15 +325,17 @@ Policy boundaries:
 
 ### Fresh clone local inventory
 
-A fresh clone intentionally ships no campaign/reference data. Tracked `.gitkeep` files preserve the empty local-data skeleton where that will not interfere with later imports:
+A fresh clone intentionally ships no campaign/reference data. The local data folders are ignored and may be absent until bootstrap/tooling creates them:
 
 - `imports/books/` — put owned/allowed PDFs or EPUBs here.
 - `imports/source-vault/` — optional read-only copy of an older Obsidian vault.
-- `imports/5etools/` — optional local 5etools mirror clone (created by bootstrap/shell when enabled; not tracked because `git clone` needs an empty target).
+- `imports/fvtt-data/` — targeted Foundry VTT JSON/TXT/ZIP exports.
+- `imports/5etools/` — optional local 5etools mirror clone.
 - `vault/notes/` — active authored campaign/table prep.
+- `vault/notes/images/` — generated image assets and adjacent asset notes.
 - `vault/library/books/` — generated Markdown output from book ingestion.
 
-`/bootstrap` can populate any optional inputs you choose, and the shell wrapper/qmd setup tolerates empty optional folders.
+The shell wrapper/qmd setup recreates the expected structure with `mkdir -p`, and `/bootstrap` can populate optional inputs you choose.
 
 ---
 

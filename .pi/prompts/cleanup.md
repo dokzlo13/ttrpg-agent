@@ -29,8 +29,8 @@ Do **not** delete anything just because this prompt was invoked.
 3. Inventory the target paths with non-destructive commands and summarize what will be deleted and preserved.
 4. Ask for an exact confirmation phrase like `CONFIRM CLEANUP <scope>`.
 5. Only after exact confirmation, execute the matching destructive command pattern from `ttrpg-system-data-cleanup` as its own shell command.
-6. Preserve tracked `.gitkeep` placeholders; do not delete them, and recreate/touch them with the skeleton before any qmd work.
+6. Recreate the expected local data folder structure with `mkdir -p` before any qmd work; do not rely on tracked placeholder files.
 7. Refresh qmd in a separate shell command when relevant. If qmd fails, inspect/report; do not rerun destructive cleanup without fresh confirmation.
-8. Report the manifest path in `/tmp/`.
+8. Report the manifest path in `/tmp`.
 
 User input: $@

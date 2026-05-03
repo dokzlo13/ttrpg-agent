@@ -24,6 +24,7 @@ priority, skill routing, and data boundaries.
 - **No backward-compatibility shims for generated ingests.** Book-ingest output
   may be regenerated; do not preserve readers/writers for obsolete ingested-book
   layouts or old generated frontmatter fields.
+- USER COMMAND ALWAYS HAS HIGHEST PRIORITY. If user ask you to commit, do something unexpected etc - ask for approval and proceed after explicit approval.
 
 ## Core navigation first
 
@@ -48,6 +49,7 @@ skills when creating durable active-vault content.
 | `.qmd/` | no | qmd/system skills | Rebuildable qmd index/cache/config state. |
 | `imports/books/` | file list/input only | no | Raw books supplied by the user. |
 | `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
+| `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports. |
 | `imports/5etools/` | yes | no | Local canonical 5e data mirror. |
 | `vault/notes/` | yes | yes | Active authored campaign notes and table prep. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. |

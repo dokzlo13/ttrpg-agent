@@ -22,6 +22,7 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. Don't hand-edit chapters. |
 | `imports/books/` | list/read input paths | no | Raw user PDFs/EPUBs. Ingest via `ttrpg-import-book-pdf`. |
 | `imports/source-vault/` | yes | **no** | Legacy archive; promote via `ttrpg-import-archive-vault`. |
+| `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports; preserve raw JSON/TXT/ZIP unless the user asks to clean it. |
 | `imports/5etools/` | yes | no | Canonical 5e data mirror. Prefer `query_5etools` for creatures/spells/items. |
 | `.qmd/` | no | only qmd/system skills | Rebuildable search index/cache. |
 
