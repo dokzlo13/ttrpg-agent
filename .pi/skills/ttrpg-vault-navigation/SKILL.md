@@ -80,6 +80,20 @@ They are AI-generated retrieval aids. Do not quote them as book prose.
 Use `qmd search/query/get` for prose retrieval; use `query_5etools` first for
 canonical creature/spell/item filters.
 
+## Frontmatter metadata helper
+
+`vault_frontmatter` is a read-only Pi tool for inspecting YAML frontmatter in the
+active notes and ingested book Markdown files. It reads only from:
+
+- `vault/notes/**/*.md`
+- `vault/library/books/**/*.md`
+
+It can list fields/values, filter by simple metadata predicates, and inspect one
+file's frontmatter/title/page/tags. It does **not** search body prose, build an
+index, use qmd, infer tags, or write files. Use it as an optional scout for broad
+or unclear library/note searches; missing metadata is never proof that content is
+absent.
+
 ## Writing rule of thumb
 
 - New active note/canvas/handout? Use `ttrpg-vault-authoring`, then optionally

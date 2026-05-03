@@ -33,6 +33,44 @@ Use `ttrpg-rules-5etools-native` for class/subclass/feat/background records. qmd
 
 Default: query `books` first for book/library questions, and `notes` for campaign-note questions. If you need more than one collection, repeat `-c`; **do not comma-join collection names**. Add `archive` only on explicit ask.
 
+## Optional frontmatter scout
+
+`vault_frontmatter` is a read-only Pi tool for YAML/frontmatter facets in
+`vault/notes/` and `vault/library/books/`. Use it as a **scout**, not as proof or
+body-text search.
+
+Good uses:
+
+- Broad/thematic requests where tags or structural fields may narrow the first pass
+  ("horror advice in Heroes of Horror", "all session notes still draft").
+- Browsing a named ingested book before searching: `values field=tags`,
+  `fields`, or page/section filters.
+- Finding candidate files by exact metadata: `tags`, `type`, `status`, `source`,
+  `book`, `section`, `page_start`, `page_end`, `system`/`systems`.
+- `inspect` instead of a head/read command when you only need frontmatter, title,
+  qmd URI, page range, tags, type/status/source, or a tiny preview.
+
+Skip it when:
+
+- The user asks for an exact proper noun, named item, named NPC, or named chapter;
+  start with `qmd search`.
+- The user asks for canonical creature/spell/item mechanics; use 5etools first.
+- Metadata would be likely to hide relevant material. Missing tags/frontmatter never
+  means the content is absent.
+
+After `vault_frontmatter find` returns candidates, **read or `qmd get` the actual
+files before quoting or summarizing**. Combine tag/frontmatter candidates with qmd
+hits when recall matters.
+
+Example broad workflow:
+
+```text
+1. vault_frontmatter values {collection: books, book: heroes-of-horror, field: tags}
+2. vault_frontmatter find {book: heroes-of-horror, match: any, filters: tags contains gm-advice/horror/encounter}
+3. qmd query "dread suspense mood isolation horror adventure" -c books
+4. qmd get/read the strongest union of hits before synthesizing
+```
+
 ## Modes
 
 qmd supports three search modes. Pick the cheapest one that answers the question:

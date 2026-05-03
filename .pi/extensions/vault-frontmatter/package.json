@@ -1,0 +1,16 @@
+{
+  "name": "vault-frontmatter-extension",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "scripts": {
+    "test": "node vault-frontmatter.test.js"
+  }
+}

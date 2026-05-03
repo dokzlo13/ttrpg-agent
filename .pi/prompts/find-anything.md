@@ -17,24 +17,32 @@ isn't structured (otherwise prefer `/find-monster` or a direct `query_5etools`).
    - If both are needed, repeat flags: `-c books -c notes` (never `books,notes`).
    - If the user says "in my old notes", add `-c archive`.
 
-2. **Pick the cheapest mode that works.**
+2. **Optionally scout frontmatter when the request is broad.**
+   - Use `vault_frontmatter` for broad/thematic or unclear scope: tags, `type`,
+     `status`, `source`, `book`, `section`, `page_start`, `system`/`systems`.
+   - Good: "horror advice in Heroes of Horror", "draft session prep notes",
+     "what kinds of material does this book contain?"
+   - Skip it for exact proper nouns, named items/NPCs/chapters, or canonical
+     mechanics. Missing tags/frontmatter is never proof of absence.
+
+3. **Pick the cheapest qmd mode that works.**
    - Proper noun ("Vecna", "Dunemark") → `qmd search` (BM25).
    - Fuzzy / conceptual ("a scene where someone is interrogated") → `qmd query`
      (hybrid expansion/vector/rerank).
    - Last-resort conceptual → `qmd vsearch`.
 
-3. **Run it.** Take the top 3–5 hits, then `qmd get` each to see surroundings
+4. **Run it.** Take the top 3–5 hits, then `qmd get` each to see surroundings
    before quoting. **Never** quote a chunk without reading the full context —
    you'll misattribute or miss a critical preceding sentence.
 
-4. **Report back** with:
+5. **Report back** with:
    - For each hit: title, source (book name + chapter, or notes path),
      2–3 sentence summary in your own words.
    - Doc IDs so the user can `qmd get` themselves.
    - Brief offer of follow-ups: "Want me to pull the full passage?", "Want me
      to summarize the chapter?", "Want a related search?"
 
-5. **If there are no hits worth showing**, say so plainly. Suggest:
+6. **If there are no hits worth showing**, say so plainly. Suggest:
    - Different keywords (the user knows their own books better).
    - Re-running with a different mode (`search` BM25 ↔ `query` hybrid).
    - That the relevant book may not be ingested yet (load `ttrpg-import-book-pdf`).

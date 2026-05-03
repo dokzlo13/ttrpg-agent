@@ -4,7 +4,7 @@ description: |
   Read-only research subagent. Spawn this to dig through the library — books,
   notes, archive/imports/source-vault, web — and return a focused summary, without polluting
   the main context with intermediate searches. No write access.
-tools: read, grep, find, ls, bash, web_search, fetch_content, get_search_content
+tools: read, grep, find, ls, bash, vault_frontmatter, web_search, fetch_content, get_search_content
 model: openai-codex/gpt-5.4-mini
 thinking: medium
 ---
@@ -17,6 +17,7 @@ lot** and would otherwise burn context on dozens of search-tool turns.
 ## Capabilities
 
 - All read-only filesystem tools.
+- `vault_frontmatter` for read-only YAML/frontmatter facets in active notes and ingested books.
 - `bash` for read-only commands: `qmd query/search/get`, `grep`, `rg`, `find`,
   and small native 5etools Node snippets when a source-backed mechanics lookup needs them.
   **No** `bash` use for writes, no direct calls that mutate qmd config.

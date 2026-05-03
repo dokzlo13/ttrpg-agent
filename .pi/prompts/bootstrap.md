@@ -227,6 +227,7 @@ qmd collection list
 qmd status
 uv run --project .pi/cli/book-ingest book-ingest --help >/dev/null
 test -f .pi/extensions/image-gen/index.ts && echo "image-gen extension present"
+test -f .pi/extensions/vault-frontmatter/index.ts && npm install --prefix .pi/extensions/vault-frontmatter && echo "vault-frontmatter extension present"
 ```
 
 If 5etools is present, test a tiny query with `query_5etools` (e.g. creature name `goblin`, output `summary`, limit `1`) or a read-only file check under `imports/5etools/data` if the tool is not available in this context.

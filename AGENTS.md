@@ -110,11 +110,14 @@ Examples:
 ### 2. Library, book, campaign, and archive search — prose, not structured records
 
 Use qmd-backed search for passages, scenes, lore, statblocks in prose, or
-campaign notes. For canonical creature/spell/item filters, use 5etools first.
+campaign notes. Use `vault_frontmatter` as an optional read-only metadata/facet
+scout for broad or unclear book/note searches. For canonical creature/spell/item
+filters, use 5etools first.
 
 | Task trigger | Use |
 |---|---|
 | Find prose/lore/statblock mentions in ingested books or active notes | `ttrpg-vault-navigation` → `ttrpg-library-search` |
+| Browse fields/tags/type/status/pages for broad book/note scoping | `ttrpg-vault-navigation` → optional `vault_frontmatter` scout, then qmd/read evidence |
 | “Did I already write about X?” | `ttrpg-vault-navigation` → `ttrpg-library-search -c notes` |
 | “Where is X discussed in my books?” | `ttrpg-vault-navigation` → `ttrpg-library-search -c books` |
 | Old/legacy vault material explicitly requested | `ttrpg-vault-navigation` → `ttrpg-library-search -c archive` and/or `ttrpg-import-archive-vault` |
@@ -127,6 +130,9 @@ Collection defaults:
 - `archive` → legacy vault; use only when explicitly requested.
 
 Always `qmd get <doc-id>` before quoting or summarizing a search hit.
+`vault_frontmatter` reads only YAML frontmatter plus optional short previews; do
+not treat missing tags/frontmatter as absence of content, and always read/qmd-get
+candidate files before quoting or summarizing them.
 
 ### 3. Vault authoring, rich notes, canvases, and legacy promotion
 
@@ -212,8 +218,9 @@ confirmation before deletion.
 
 - **Canonical monster/spell/item:** `ttrpg-rules-5etools-query`; if absent and
   user wants prose, then navigation → qmd book search.
-- **Book/campaign prose lookup:** navigation → `ttrpg-library-search` →
-  `qmd get` before quoting/summarizing.
+- **Book/campaign prose lookup:** navigation → optional `vault_frontmatter` for
+  broad metadata scouting → `ttrpg-library-search` → `qmd get` before
+  quoting/summarizing.
 - **PDF ingest:** navigation → `ttrpg-import-book-pdf` (CLI returns ordered
   `next_steps` covering classify/summarize/tag/qmd; run them).
 - **OSR monster to Foundry:** source lookup → `ttrpg-rules-osr-to-5e` →
@@ -243,7 +250,7 @@ Prompt shortcuts include:
 | Prompt | Use |
 |---|---|
 | `/find-monster` | canonical monster lookup: 5etools first, qmd fallback |
-| `/find-anything` | qmd/library search across books/notes/archive |
+| `/find-anything` | qmd/library search across books/notes/archive; optional `vault_frontmatter` scout for broad/unclear metadata |
 | `/convert-monster` | OSR/non-5e monster → 5e + Foundry importer text |
 | `/foundry-monster` | normalize existing monster for Foundry importer |
 | `/cleanup` | destructive cleanup workflow with confirmation |

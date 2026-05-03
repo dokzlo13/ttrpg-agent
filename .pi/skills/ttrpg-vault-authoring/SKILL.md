@@ -84,7 +84,9 @@ Every durable note should improve the Obsidian graph.
 
 ## Minimal frontmatter
 
-Use frontmatter for filtering, not as a substitute for links:
+Use frontmatter for filtering, not as a substitute for links. The
+`vault_frontmatter` tool can browse/filter these fields later, so keep names
+consistent and values boring.
 
 ```yaml
 ---
@@ -95,6 +97,17 @@ tags: [campaign]
 status: draft | reviewed | canon
 ---
 ```
+
+Tag policy:
+
+- `tags: [campaign]` is the active-note minimum unless a note is explicitly
+  non-campaign meta.
+- Add 1–4 obvious topical tags when semantically useful (`horror`, `prep`,
+  `faction`, `mystery`, etc.). The LLM may choose these as part of authoring.
+- Do not spam tags or duplicate every frontmatter field as a tag; use `type`,
+  `status`, `source`, and optional properties for structured filtering.
+- Do not use regex/tool heuristics to invent semantic tags. If meaning is unclear,
+  leave topical tags out rather than guessing.
 
 Optional but useful properties for richer notes:
 

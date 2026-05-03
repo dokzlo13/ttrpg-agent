@@ -18,6 +18,7 @@ This repository tracks the machinery: pi skills, slash prompts, subagents, exten
 ## What it can do
 
 - Search active notes, ingested books, and an optional legacy archive with **qmd**.
+- Browse/filter YAML frontmatter facets (`tags`, `type`, `status`, pages, systems) through the read-only `vault_frontmatter` pi tool.
 - Query local **5etools** for canonical creatures, spells, and items through a custom pi tool.
 - Ingest RPG PDFs into cross-linked Markdown under `vault/library/books/` using **marker-pdf**.
 - Write durable Obsidian notes, stubs, canvases, read-alouds, NPCs, mechanics notes, and connections under `vault/notes/`.
@@ -49,7 +50,7 @@ ttrpg-agent/
 │   ├── skills/                # task-specific operating procedures
 │   ├── prompts/               # slash prompts, e.g. /find-monster
 │   ├── agents/                # focused subagent definitions
-│   ├── extensions/            # project-local pi extensions, incl. query_5etools
+│   ├── extensions/            # project-local pi extensions, incl. query_5etools and vault_frontmatter
 │   ├── scripts/               # launch/qmd environment wrappers
 │   └── cli/                   # uv-managed helper CLIs
 ├── .qmd/                      # ignored qmd config/cache/index/model state
@@ -126,6 +127,9 @@ uv tool install --python 3.12 --reinstall marker-pdf --with psutil
 git clone <your-fork-url> ttrpg-agent
 cd ttrpg-agent
 cp .env.example .env
+
+# Project-local extension dependency for vault_frontmatter.
+npm install --prefix .pi/extensions/vault-frontmatter
 ```
 
 Authenticate pi with your subscription, then run the one-time guided bootstrap prompt:
@@ -216,6 +220,11 @@ qmd update && qmd embed
 /find-anything haunted charcoal burners in my notes and books
 /find-monster goblin boss
 ```
+
+For broad or unclear scoping, agents may use `vault_frontmatter` before qmd to
+browse metadata facets such as tags, note types, status, book pages, sections, or
+systems. It is read-only and file-backed; missing metadata is not treated as
+absence of content.
 
 ### Convert and prepare for Foundry
 
@@ -337,7 +346,7 @@ Skills are procedural reference files the agent loads when a task matches. Curre
   - `ttrpg-rules-5etools-native` — direct JS/native 5etools spelunking for classes, feats, backgrounds, schema details, and unsupported records.
   - `ttrpg-rules-osr-to-5e` — OSR/OSE/BX/AD&D monster/trap/mechanic conversion judgment.
 - **Search/research**
-  - `ttrpg-library-search` — qmd search over `books`, `notes`, and optional `archive`.
+  - `ttrpg-library-search` — qmd search over `books`, `notes`, and optional `archive`, with optional `vault_frontmatter` metadata scouting.
   - `ttrpg-research-web` — outside-web inspiration/research with citations.
 - **Vault authoring**
   - `ttrpg-vault-authoring` — placement, file boundaries, stubs, graph/link policy.
@@ -369,7 +378,7 @@ Prompt templates live in `.pi/prompts/` and are invoked inside pi with `/name`:
 |---|---|
 | `/bootstrap` | One-time first-run setup wizard: dependencies, `.env`, optional imports, smoke tests. |
 | `/find-monster` | Canonical monster lookup; 5etools first, qmd fallback. |
-| `/find-anything` | General qmd search across books/notes/archive. |
+| `/find-anything` | General qmd search across books/notes/archive, with optional frontmatter scouting for broad scope. |
 | `/convert-monster` | OSR/non-5e monster → 5e + Foundry importer text. |
 | `/foundry-monster` | Normalize an existing statblock for Foundry importer paste. |
 | `/npc` | Fast NPC sketch, with optional save to vault. |
@@ -404,6 +413,24 @@ It exposes a project-local pi tool for common 5etools lookups:
 - Ruleset preference: `2014`, `2024`, or `either`
 
 For unsupported 5etools entity types or renderer weirdness, agents use `ttrpg-rules-5etools-native` and small read-only Node snippets against `imports/5etools/`.
+
+### `vault_frontmatter` pi extension
+
+Located in `.pi/extensions/vault-frontmatter/`.
+
+It exposes a project-local, read-only pi tool for YAML frontmatter in:
+
+- `vault/notes/**/*.md`
+- `vault/library/books/**/*.md`
+
+Actions:
+
+- `fields` — list available frontmatter fields in a scope.
+- `values` — list values/counts for one field, such as `tags`, `type`, `status`, or `system`.
+- `find` — return files matching simple predicates (`exists`, `missing`, `equals`, `contains`, `matches`, `gte`, `lte`).
+- `inspect` — show one file's frontmatter, title, qmd URI, page range, and optional short preview.
+
+It does not search body prose, infer metadata, maintain an index/cache, or write files. Agents use it as an optional metadata/facet scout before qmd/read evidence when broad scope is unclear. The local `yaml` dependency gives full YAML parsing; run `npm install --prefix .pi/extensions/vault-frontmatter` after clone or via `/bootstrap`. Full contract and examples are in `.pi/extensions/vault-frontmatter/README.md`.
 
 ### `.pi/cli/book-ingest`
 
