@@ -1,76 +1,150 @@
 # AGENTS.md
 
-You are running inside **ttrpg-agent**, a Pi-powered workspace for helping the user prep
-**Dungeons & Dragons 5e (2024)** sessions. This repo skeleton has completed bootstrap cleanup;
-treat this file as your standing orders.
+You are running inside **ttrpg-agent**, a Pi-powered workspace for D&D/TTRPG
+session prep, local reference search, and book ingestion. Be a creative
+collaborator by default, but treat this file as the project contract for source
+priority, skill routing, and data boundaries.
 
----
+## Non-negotiables
 
-## Identity and posture
+- **Do the work.** Ask only when placement, scope, or destructive action would
+  materially change meaning.
+- **Local sources beat memory.** For rules facts, book references, and campaign
+  details, search local data first.
+- **Do not edit imports.** `imports/source-vault/`, `imports/books/`, and
+  `imports/5etools/` are read-only.
+- **Do not hand-edit ingested books.** Use `book-ingest` /
+  `ttrpg-import-book-pdf` for `vault/library/books/` changes.
+- **Do not commit.** The user reviews all repo and data changes before commit.
+- **Use project Python conventions.** Never run raw `python` / `python3`; use
+  `uv run python ...` or `uv run --project .pi/cli/<tool> ...`.
+- **No heuristic smart decisions in tools.** If a pipeline/tool/plugin must
+  classify, infer, tag, summarize, or choose semantic metadata, use an LLM or
+  leave the field empty/unknown. Do not add regex/text-heuristic fallback guesses.
+- **No backward-compatibility shims for generated ingests.** Book-ingest output
+  may be regenerated; do not preserve readers/writers for obsolete ingested-book
+  layouts or old generated frontmatter fields.
 
-You are a **creative collaborator first**, code-executor second. The user is a DM with limited
-prep time who wants creativity, not file-management. Default to:
+## Core navigation first
 
-- Doing the work, not asking how the user wants it done.
-- Writing useful reusable notes into `vault/notes/` as a side-effect of helping.
-- Preserving a good Obsidian graph: create body wikilinks and connection sections, not just rich frontmatter.
-- Citing sources when you read from ingested books or local reference data.
-- Briefly pushing back when an idea breaks 5e mechanics or contradicts campaign notes, with a concrete alternative.
+Use **`ttrpg-vault-navigation`** before any task that reads from or writes to
+`vault/`, `imports/`, `vault/library/books/`, or qmd collections. It is the
+single source for:
 
-Treat your own parametric memory as **untrusted** for D&D rules facts when a local source exists.
-For canonical rules/class/spell/item/monster questions, prefer ground truth from `imports/5etools/`
-or ingested books before answering.
+- active notes vs ingested book artifacts vs raw imports;
+- qmd collection mapping (`books`, `notes`, `archive`);
+- current book-ingest layout;
+- what may be written directly and what must go through a tool.
 
----
+This navigation skill does **not** replace `ttrpg-vault-authoring`; it only
+answers "where is it and what are the boundaries?" Use authoring/rich-note/canvas
+skills when creating durable active-vault content.
 
-## Minimal project structure
+### Minimal workspace map
 
-| Path | Read? | Write? | What it is |
-|---|---|---|---|
-| `.pi/` | yes | yes, sparingly | Project backbone: Pi settings, skills, prompts, agents, extensions, scripts, and tools. |
-| `.pi/cli/` | yes | only when fixing a tool | Tracked custom CLI tools. |
-| `.pi/scripts/` | yes | only when fixing shell/qmd behavior | Tracked shell helpers. |
-| `.qmd/` | no | only via qmd/system skills | Ignored qmd config/cache/index state. |
-| `imports/books/` | file list only | no | Ignored raw PDFs/EPUBs supplied by the user. |
-| `imports/source-vault/` | yes | **NO** | Ignored legacy vault; read-only inspiration/source material. |
-| `imports/5etools/` | yes | no | Ignored 5etools mirror clone. |
-| `vault/` | yes | **yes** | Ignored Obsidian workspace root for local campaign/reference data. |
-| `vault/notes/` | yes | yes | Active authored campaign notes, canvases, and table prep; flexible internal structure. |
-| `vault/library/books/` | yes | only via `book-ingest` | Ingested book markdown, cross-linked by book/chapter. |
+| Path | Read? | Write? | Purpose |
+|---|---:|---:|---|
+| `.pi/` | yes | sparingly | Project machinery: skills, prompts, agents, CLI tools. |
+| `.qmd/` | no | qmd/system skills | Rebuildable qmd index/cache/config state. |
+| `imports/books/` | file list/input only | no | Raw books supplied by the user. |
+| `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
+| `imports/5etools/` | yes | no | Local canonical 5e data mirror. |
+| `vault/notes/` | yes | yes | Active authored campaign notes and table prep. |
+| `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. |
 
-**Data policy:** all user/campaign/reference data is ignored by git (`vault/`, `imports/`, `.qmd/`).
-Track repo machinery only.
+### Ingested book layout
 
----
-
-## Tooling and Python execution
-
-Prefer project-local, reproducible tool commands over system interpreters. In particular:
-
-- Do **not** run ad-hoc Python with raw `python` or `python3`.
-- Use `uv run python - <<'PY' ... PY` for temporary Python snippets.
-- If a one-off snippet needs optional packages, inject them with `uv run --with <package> python - <<'PY' ... PY` instead of installing globally.
-- Use `uv run --project .pi/cli/<tool> ...` for project helper CLIs, and `uv tool install ...` for standalone Python tools such as Marker.
-
-Example:
-
-```bash
-uv run --with requests python - <<'PY'
-import requests
-response = requests.get('https://httpbin.org/get')
-print(f"Status Code: {response.status_code}")
-PY
+```text
+vault/library/books/
+└── <slug>/
+    ├── __<slug>.md    # book overview / TOC; first visible file in Obsidian
+    ├── 01-…md         # chapter chunks; qmd search/get usually returns these
+    ├── images/
+    └── .ingest/
+        ├── provenance.json   # source hash/status/system/llm
+        └── report.json       # validation + follow-on observability
 ```
 
-## Vault writing and links
+Read chapters first for citations, overview second for TOC/page ranges,
+`.ingest/provenance.json` for provenance, and `.ingest/report.json` when quality status is
+`review` or `failed`. Generated chapters use `# Title`, chapter text, then a
+final `---` nav footer with full-vault wikilinks. The `__<slug>.md` overview has
+TOC metadata (`book-index`/`toc`) and is not sent to chapter summarize/tag
+follow-ons. Image descriptions are `> [!image] AI description` callouts and are
+AI-generated retrieval aids, not book prose.
 
-Before creating, moving, or migrating durable notes, canvases, or vault artifacts, read/use **`ttrpg-vault-authoring`**.
-The active notes tree is intentionally flexible: prefer existing local folders under `vault/notes/`,
-create obvious semantic folders when useful, and ask one focused placement question rather than using a junk-drawer folder when placement would change meaning.
+## Skill routing priority
 
-Use **`ttrpg-vault-rich-notes`** when a Markdown note should be more than a stub: Obsidian callouts, aliases, embeds, block IDs, source polish, and table-ready structure. Use **`ttrpg-vault-canvas`** for Obsidian `.canvas` files, visual relationship maps, clue boards, timelines, and canvas JSON validation.
+Skills are progressive reference material. If a task matches a skill, read that
+`SKILL.md` before acting. Prefer the most specific matching skill, but keep this
+order in mind:
 
-Every durable note should include:
+> navigation/source → rules/search/import → conversion/format → vault placement → rich output/canvas → index/cleanup
+
+### 0. Workspace navigation and source boundaries
+
+Use this whenever local data is involved, before choosing deeper workflow skills.
+
+| Task trigger | Use |
+|---|---|
+| Any read/write under `vault/`, `imports/`, `vault/library/books/`, qmd collections | `ttrpg-vault-navigation` |
+| Unsure if something is active notes, ingested book output, archive, raw import, or qmd index | `ttrpg-vault-navigation` |
+| Need to cite or inspect ingested book artifacts | `ttrpg-vault-navigation` |
+
+### 1. Canonical D&D rules and structured data — highest priority for mechanics
+
+Do not answer mechanics from memory when local canonical data exists.
+
+| Task trigger | Use skill/tool |
+|---|---|
+| Creature, spell, or item lookup; CR/source/type/level/rarity filters | `ttrpg-rules-5etools-query` + `query_5etools` |
+| Classes, subclasses, feats, backgrounds, 2014/2024 representation, unsupported 5etools records | `ttrpg-rules-5etools-native` |
+| OSR/OSE/BX/AD&D monster, trap, or mechanic conversion to 5e | `ttrpg-rules-osr-to-5e` |
+
+Examples:
+
+- “Show me CR 5–7 fey” → `query_5etools`.
+- “What does Paladin get at level 5?” → native 5etools workflow.
+- “5e-ify this OSE monster” → OSR conversion, then Foundry formatting if needed.
+
+### 2. Library, book, campaign, and archive search — prose, not structured records
+
+Use qmd-backed search for passages, scenes, lore, statblocks in prose, or
+campaign notes. For canonical creature/spell/item filters, use 5etools first.
+
+| Task trigger | Use |
+|---|---|
+| Find prose/lore/statblock mentions in ingested books or active notes | `ttrpg-vault-navigation` → `ttrpg-library-search` |
+| “Did I already write about X?” | `ttrpg-vault-navigation` → `ttrpg-library-search -c notes` |
+| “Where is X discussed in my books?” | `ttrpg-vault-navigation` → `ttrpg-library-search -c books` |
+| Old/legacy vault material explicitly requested | `ttrpg-vault-navigation` → `ttrpg-library-search -c archive` and/or `ttrpg-import-archive-vault` |
+| qmd results stale/missing/duplicated/wrong collection | `ttrpg-system-qmd-maintenance` |
+
+Collection defaults:
+
+- `books` → `vault/library/books/**/*.md`.
+- `notes` → `vault/notes/**/*.md`.
+- `archive` → legacy vault; use only when explicitly requested.
+
+Always `qmd get <doc-id>` before quoting or summarizing a search hit.
+
+### 3. Vault authoring, rich notes, canvases, and legacy promotion
+
+Use these for durable active campaign notes under `vault/notes/`. Keep book
+reference output separate from active authored prep.
+
+| Task trigger | Use |
+|---|---|
+| Create, save, move, or normalize durable active notes/artifacts | `ttrpg-vault-navigation` → `ttrpg-vault-authoring` |
+| Table-ready Markdown, aliases, callouts, embeds, block IDs, source polish | `ttrpg-vault-authoring` → `ttrpg-vault-rich-notes` |
+| Obsidian canvas, relationship map, clue board, timeline, encounter/session flow | `ttrpg-vault-authoring` → `ttrpg-vault-canvas` |
+| Promote selected legacy notes from `imports/source-vault/` | navigation/search archive → `ttrpg-import-archive-vault` → `ttrpg-vault-authoring` |
+
+Every durable active note should include useful frontmatter plus body wikilinks
+and a `## Connections` section. If an important wikilink target does not exist,
+create a small stub in the appropriate semantic folder unless it is a throwaway.
+
+Minimal frontmatter pattern:
 
 ```yaml
 ---
@@ -82,215 +156,132 @@ status: draft | reviewed | canon
 ---
 ```
 
-Use frontmatter for filtering, but use **Obsidian wikilinks in the body** for graph structure:
-
-- Link important entities: `[[dunemark]]`, `[[lord-blackthorne|Lord Blackthorne]]`.
-- Add `## Connections` sections to reusable notes.
-- If an important link target does not exist, create a short stub in the appropriate semantic folder under `vault/notes/`.
-- Book ingests should cross-link `_book.md` ↔ chapters and chapter previous/next links.
-
----
-
-## Skill taxonomy and routing priority
-
-Skills are progressive reference material. If a task matches a skill, read its `SKILL.md` before
-acting and briefly name the skill(s) you are using. Prefer the most specific matching skill, then
-compose skills in this natural order:
-
-> lookup/source → conversion/format → vault placement → rich-note/canvas authoring → index maintenance
-
-### 1. Rules and canonical D&D data — highest priority for mechanics
-
-Use these before memory for any factual 5e mechanics answer.
-
-| Task trigger | Use skill/tool |
-|---|---|
-| Canonical creature/spell/item lookup, CR/source/type/level/rarity filters | `ttrpg-rules-5etools-query` + `query_5etools` |
-| Classes, subclasses, feats, backgrounds, 2014/2024 representation, unsupported 5etools records | `ttrpg-rules-5etools-native` |
-| OSR/OSE/BX/AD&D monster, trap, or mechanic conversion to 5e | `ttrpg-rules-osr-to-5e` |
-
-Rules examples:
-
-- “Show me CR 5–7 fey” → `ttrpg-rules-5etools-query`.
-- “What does Paladin get at level 5?” → `ttrpg-rules-5etools-native`.
-- “5e-ify this OSE monster” → `ttrpg-rules-osr-to-5e` → optionally Foundry formatting.
-
-### 2. Library and campaign search — prose, not structured records
-
-Use qmd-backed search when the answer is a passage, scene, lore note, or book/campaign mention.
-For canonical creature/spell/item filters, use 5etools first instead.
-
-| Task trigger | Use skill |
-|---|---|
-| Search ingested books, active notes, or optional archive prose | `ttrpg-library-search` |
-| Search index stale/missing/duplicated/wrong collections | `ttrpg-system-qmd-maintenance` |
-
-Collection defaults:
-
-- `books` for ingested sourcebooks/adventures in `vault/library/books/`.
-- `notes` for active authored campaign memory in `vault/notes/`.
-- `archive` only when the user explicitly asks for old/legacy vault material.
-
-Examples:
-
-- “Did I already write about Blackthorne?” → `ttrpg-library-search` with `notes`.
-- “Where is the haunted lighthouse mentioned?” → `ttrpg-library-search` with `books`.
-- “Search seems stale” → `ttrpg-system-qmd-maintenance`.
-
-### 3. Vault authoring, rich notes, canvases, and legacy promotion
-
-Use these for durable campaign notes, Obsidian canvases, and active vault structure. Keep skills composable: placement first, then rich Markdown or Canvas details only when needed.
-
-| Task trigger | Use skill |
-|---|---|
-| Create, save, move, or normalize durable active notes/artifacts | `ttrpg-vault-authoring` |
-| Write table-ready Obsidian Markdown with callouts, embeds, aliases, block IDs, note patterns, or source polish | `ttrpg-vault-rich-notes` after `ttrpg-vault-authoring` |
-| Create/edit/validate Obsidian `.canvas` files, relationship maps, clue boards, encounter/session flow boards | `ttrpg-vault-canvas` after `ttrpg-vault-authoring` |
-| Promote selected old-vault notes from `imports/source-vault/` | `ttrpg-import-archive-vault` |
-
-Examples:
-
-- “Save this NPC/location/read-aloud” → `ttrpg-vault-authoring` → optionally `ttrpg-vault-rich-notes`.
-- “Make a clue board / relationship map” → `ttrpg-vault-authoring` → `ttrpg-vault-canvas`.
-- “Pull my old Red Chapel notes into the active vault” → `ttrpg-library-search -c archive` → `ttrpg-import-archive-vault` → `ttrpg-vault-authoring` → optionally `ttrpg-vault-rich-notes`.
-
 ### 4. Imports and ingests
 
 Use these when new external files need to become usable local reference material.
 
-| Task trigger | Use skill/subagent |
+| Task trigger | Use |
 |---|---|
-| New PDF book ingest into `vault/library/books/` | `ttrpg-import-book-pdf` → `ingest-worker` |
+| New PDF book ingest, system classification, summaries, or tags on an ingested book | `ttrpg-import-book-pdf` (canonical end-to-end pipeline doc) |
+| Manual tag fallback when `OPENAI_API_KEY` is absent or per-chapter override | `ttrpg-tag-book-manual` |
 | One-off non-book PDF/handout/raw Marker debug conversion | `ttrpg-import-raw-pdf` |
 | Legacy/archive note import | `ttrpg-import-archive-vault` |
 
-Examples:
-
-- “I added a new PDF book” → `ttrpg-import-book-pdf` → `qmd update` → `qmd embed`.
-- “Just dump this handout PDF to markdown” → `ttrpg-import-raw-pdf`.
+The book-ingest CLI's `next_steps` is the agent contract: run them in order,
+don't invent omitted steps. With `OPENAI_API_KEY` present, every metered
+follow-on plus `qmd update && qmd embed` is emitted; without a key, only the
+qmd refresh is. See `ttrpg-import-book-pdf` for details.
 
 ### 5. Foundry VTT tooling
 
-Keep Foundry implementation, importer format, and clickable prose separate.
+Keep importer format, clickable prose, and system implementation separate.
 
-| Task trigger | Use skill |
+| Task trigger | Use |
 |---|---|
 | Foundry 5e-statblock-importer paste text | `ttrpg-foundry-statblock-importer` |
-| Foundry journal/actor/item prose with clickable rolls, saves, checks, references | `ttrpg-foundry-enrichers` |
-| Foundry dnd5e system implementation: activities, effects, advancements, formulas, hooks | `ttrpg-foundry-dnd5e-wiki` |
+| Foundry actor/item/journal prose with clickable rolls, saves, checks, references | `ttrpg-foundry-enrichers` |
+| Foundry dnd5e system implementation: activities, effects, advancements, hooks, formulas | `ttrpg-foundry-dnd5e-wiki` |
 
-Examples:
-
-- “Make this monster Foundry-importable” → `ttrpg-foundry-statblock-importer`.
-- “Add clickable saves/damage to this journal entry” → `ttrpg-foundry-enrichers`.
-- “How do I configure this activity/effect?” → `ttrpg-foundry-dnd5e-wiki`.
-
-**Importer rule:** main statblock importer text must be plain WotC-style prose. Put Foundry enrichers only in a separate post-import section.
+Importer rule: main statblock importer text must be plain WotC-style prose.
+Foundry enrichers belong only in a separate post-import section.
 
 ### 6. Creative prep and outside inspiration
 
-Use these to make table-facing material, not to answer local canonical mechanics.
+Use these to produce table-facing material, not to answer local canonical facts.
 
-| Task trigger | Use skill/prompt |
+| Task trigger | Use |
 |---|---|
-| Read-aloud / boxed text / scene description | `ttrpg-create-readaloud` |
+| Read-aloud, boxed text, scene description | `ttrpg-create-readaloud` |
 | Web inspiration, naming, mythology, current rulings beyond local data | `ttrpg-research-web` |
-| Image generation requests | `ttrpg-create-image-gen` only on explicit user request |
-| Quick NPC sketch | `/npc` prompt, then `ttrpg-vault-authoring` if saved |
+| Explicit image-generation request | `ttrpg-create-image-gen` |
+| Quick NPC sketch | `/npc`; save only if useful via vault authoring |
 
-Examples:
-
-- “Describe this room for me to read” → `ttrpg-create-readaloud`.
-- “Give me Welsh-coded place names” → `ttrpg-research-web`.
-- “Make an innkeeper NPC” → `/npc`; save only if useful.
+Image generation is metered; only call it on explicit user request.
 
 ### 7. System maintenance and destructive cleanup
 
-Keep system work separate from creative/rules work.
-
-| Task trigger | Use skill |
+| Task trigger | Use |
 |---|---|
 | qmd refresh/reindex/rebuild/collection verification | `ttrpg-system-qmd-maintenance` |
-| Destructive cleanup/reset of vault/import/index data | `ttrpg-system-data-cleanup` |
+| Destructive cleanup/reset/purge/remove of vault/import/index data | `ttrpg-system-data-cleanup` |
 
-Destructive cleanup always requires explicit scope, dry-run inventory, and exact confirmation before deletion.
-
----
+Destructive cleanup always requires exact scope, dry-run inventory, and explicit
+confirmation before deletion.
 
 ## Common chains
 
-- Find canonical monster → `ttrpg-rules-5etools-query`; if absent and the user wants book prose, `ttrpg-library-search`.
-- Find prose/lore in books/notes → `ttrpg-library-search` → `qmd get` before quoting/summarizing.
-- Convert OSR monster for Foundry → source text or `ttrpg-library-search` → `ttrpg-rules-osr-to-5e` → `ttrpg-foundry-statblock-importer` → optional `ttrpg-foundry-enrichers` → `ttrpg-vault-authoring`.
-- Foundry item/actor setup → `ttrpg-foundry-dnd5e-wiki` for system behavior → `ttrpg-foundry-enrichers` for description syntax.
-- Ingest a PDF book → `ttrpg-import-book-pdf` → `ingest-worker` → inspect quality → `qmd update` → `qmd embed`.
-- Save any durable result → `ttrpg-vault-authoring` → optionally `ttrpg-vault-rich-notes` / `ttrpg-vault-canvas` → write under `vault/notes/` → `qmd update` when indexing is needed.
-- Build a visual clue board or relationship map → `ttrpg-vault-authoring` → `ttrpg-vault-canvas` → validate JSON → optional companion note with `ttrpg-vault-rich-notes`.
-- Promote old-vault material → `ttrpg-library-search -c archive` or `rg` → read source → `ttrpg-import-archive-vault` if raw copy is useful → normalize with `ttrpg-vault-authoring` → `qmd update`.
-- Cleanup/reset → `ttrpg-system-data-cleanup`; never delete before exact confirmation.
+- **Canonical monster/spell/item:** `ttrpg-rules-5etools-query`; if absent and
+  user wants prose, then navigation → qmd book search.
+- **Book/campaign prose lookup:** navigation → `ttrpg-library-search` →
+  `qmd get` before quoting/summarizing.
+- **PDF ingest:** navigation → `ttrpg-import-book-pdf` (CLI returns ordered
+  `next_steps` covering classify/summarize/tag/qmd; run them).
+- **OSR monster to Foundry:** source lookup → `ttrpg-rules-osr-to-5e` →
+  `ttrpg-foundry-statblock-importer` → optional Foundry enrichers → vault
+  authoring if saved.
+- **Foundry item/actor setup:** `ttrpg-foundry-dnd5e-wiki` for system behavior,
+  `ttrpg-foundry-enrichers` for description syntax.
+- **Save durable prep:** navigation → `ttrpg-vault-authoring` → optional
+  rich-note/canvas skill → write under `vault/notes/` → qmd refresh if needed.
+- **Promote old-vault material:** navigation → archive search/read →
+  `ttrpg-import-archive-vault` → vault authoring → optional rich note.
+- **Cleanup/reset:** `ttrpg-system-data-cleanup`; never delete before exact
+  confirmation.
 
----
+## Subagents and prompt shortcuts
 
-## Prompts and subagents
+Use subagents when context/log volume would balloon:
 
-Prompt templates are workflow shortcuts, not replacements for source-backed lookup:
+- One non-5e statblock conversion → `statblock-converter`.
+- Broad fact-finding across books/notes/archive/web → `researcher`.
+
+When using `subagent(...)`, omit `output` unless you want a real output file
+path. Do **not** pass `output: false`; this runtime may stringify it.
+
+Prompt shortcuts include:
 
 | Prompt | Use |
 |---|---|
 | `/find-monster` | canonical monster lookup: 5etools first, qmd fallback |
 | `/find-anything` | qmd/library search across books/notes/archive |
 | `/convert-monster` | OSR/non-5e monster → 5e + Foundry importer text |
-| `/foundry-monster` | normalize an existing monster for Foundry importer |
-| `/ingest-book` | PDF book ingest workflow |
+| `/foundry-monster` | normalize existing monster for Foundry importer |
 | `/cleanup` | destructive cleanup workflow with confirmation |
 | `/npc` | quick NPC sketch |
 | `/readaloud` | boxed text / scene opener |
 | `/illustrate` | explicit image-generation request |
 
-Use subagents when context/log volume would balloon:
+Prompt shortcuts do not replace source-backed lookup.
 
-- Ingest a PDF → `ingest-worker`.
-- Convert one non-5e statblock → `statblock-converter`.
-- Broad fact-finding across books/notes/archive/web → `researcher`.
+## Citations and copyright posture
 
-When using `subagent(...)`, omit `output` unless you want a real output file path. Do **not** pass
-`output: false`; this runtime may stringify it into a literal `false` path.
+The PDFs are the user's local, legitimately purchased materials. You may quote
+or restructure for personal prep, but avoid long verbatim passages in chat.
+Prefer paraphrase with citations like:
 
----
-
-## Copyright and citations
-
-The PDFs are the user's local, legitimately purchased materials. You may quote/restructure for
-personal prep, but avoid long verbatim passages in chat. Prefer paraphrase with citations like:
-
-- `vault/library/books/<book>/<chapter>.md:<line>`
+- `vault/library/books/<slug>/<chapter>.md:<line>`
 - `imports/source-vault/<path>`
 - `imports/5etools/data/...`
 
----
+## Handling uncertainty
 
-## How to handle uncertainty
-
-If you don't know:
-
-- A canonical mechanics fact: search 5etools/local sources first, then say what was or wasn't found.
-- A user-specific campaign detail: search the `notes` qmd collection and, only if explicitly needed, `archive`/`imports/source-vault/`.
-- Where to place a note: use `ttrpg-vault-authoring`; choose the best semantic folder, or ask one focused question if placement changes meaning.
-
-Whenever you write/update a vault note, tell the user the path and either paste short content or give
-a brief excerpt/summary.
-
----
+- Mechanics fact uncertain? Search 5etools/local sources first, then say what
+  was or was not found.
+- Campaign detail uncertain? Search `notes`; use `archive` only when explicitly
+  needed.
+- Placement uncertain? Use navigation + vault authoring; choose the best
+  semantic folder or ask one focused question if placement changes meaning.
+- After writing/updating a vault note, tell the user the path and give a short
+  excerpt or summary.
 
 ## Don't
 
-- Don't edit anything in `imports/source-vault/`. Ever.
-- Don't commit user data, qmd indexes, PDFs, 5etools clones, Obsidian state, generated images, or vault notes.
-- Don't change `.pi/settings.json` `defaultProvider` without explicit instruction.
+- Don't edit `imports/source-vault/`, raw PDFs, 5etools data, or ingested book
+  chapters by hand.
+- Don't commit user data, qmd indexes, PDFs, 5etools clones, Obsidian state,
+  generated images, or vault notes.
+- Don't change `.pi/settings.json` `defaultProvider` without instruction.
 - Don't propose paid-cloud workflows when a local OSS path exists.
 - Don't hand-edit `vault/library/books/`; re-ingest instead.
-- Don't leave durable notes isolated: add useful wikilinks and `## Connections`.
-
----
-
-*The detailed procedures live in skills, prompts, agents, and tools. Prefer the grouped routing above over ad-hoc memory.*
+- Don't leave durable notes isolated: add body wikilinks and useful
+  connections.

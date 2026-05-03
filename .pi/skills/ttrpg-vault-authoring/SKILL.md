@@ -71,12 +71,13 @@ Every durable note should improve the Obsidian graph.
   an appropriate semantic folder under `vault/notes/`.
 - Prefer body links over frontmatter-only relationships; Obsidian's graph is
   driven by links in note text.
-- When linking from active notes to ingested book indexes, do **not** invent a
-  slug note like `[[the-pit-in-the-forest]]` unless that note exists. The book
-  index file is usually named `_book.md`, so use a path-qualified Obsidian link
-  from the vault root, e.g. `[[library/books/the-pit-in-the-forest-v1-2-basic-bx/_book|The Pit in the Forest]]`.
-  Section/chapter links may use their generated filenames when unique, e.g.
-  `[[09-3-hollow-eyed-charcoal-burners|3 Hollow-eyed charcoal burners]]`.
+- When linking from active notes to ingested books, do **not** invent a slug
+  note like `[[the-pit-in-the-forest]]` unless that active note exists. Book
+  overviews are named `vault/library/books/<slug>/__<slug>.md`, so use a
+  path-qualified Obsidian link from the vault root, e.g.
+  `[[library/books/the-pit-in-the-forest-v1-2-basic-bx/__the-pit-in-the-forest-v1-2-basic-bx|The Pit in the Forest]]`.
+  Chapter links should include the chapter directory when ambiguity is possible,
+  e.g. `[[library/books/the-pit-in-the-forest-v1-2-basic-bx/01-the-pit-in-the-forest|The Pit in the Forest]]`.
 - For generated artifacts, link back to the source/context note when known.
 - For canvases, prefer file nodes pointing at existing notes and add a companion
   Markdown note if the canvas needs frontmatter, long sources, or qmd indexing.

@@ -83,10 +83,10 @@ Guidelines:
 
 - Prefer stable slug links for authored active notes: `[[mara-vale]]`.
 - Use aliases for display text: `[[mara-vale|Captain Mara Vale]]`.
-- Path-qualify links to generated book indexes when needed, e.g.
-  `[[library/books/the-pit-in-the-forest-v1-2-basic-bx/_book|The Pit in the Forest]]`.
-- Do not invent links to generated book chapter slugs unless you have checked the
-  file exists.
+- Path-qualify links to generated book overviews when needed, e.g.
+  `[[library/books/the-pit-in-the-forest-v1-2-basic-bx|The Pit in the Forest]]`.
+- Path-qualify generated book chapter links when ambiguity is possible, and only
+  after checking the file exists.
 
 ### Embeds
 

@@ -40,15 +40,14 @@ When the user has not chosen a precise scope, offer these options:
 | `all-index-caches` | Contents of `.qmd/` | Keeps `.qmd/` directory. May force model/cache re-downloads. Does **not** touch `.pi/cli/`. |
 | `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. |
 | `ingested-books` | Generated book folders under `vault/library/books/`, either all or selected slugs | Keeps `vault/library/books/` directory. Does not delete source PDFs in `imports/books/`. |
-| `book-ingest-cache` | Contents of `.cache/book-ingest/`, all or per-hash | Keeps `.cache/book-ingest/` directory. Safe: cache is debug-only; the canonical content stays in `vault/library/books/`. |
-| `book-ingest-backups` | Stale `.<slug>.<timestamp>.bak` directories under `vault/library/books/` | Keeps current ingested content. These appear when book-ingest runs with `--keep-backup`. |
+| `book-ingest-backups` | Stale `.<slug>.<timestamp>.bak` directories and `.<slug>.<timestamp>.bak.md` overview backups under `vault/library/books/` | Keeps current ingested content. These appear when book-ingest runs with `--keep-backup`. |
 | `vault-content` | Active vault content: `vault/notes/`, `vault/library/books/`, and generated data folders such as `vault/images/` if present | Keeps `vault/`, `vault/.obsidian/`, `vault/notes/`, `vault/library/books/`; ask before deleting any unusual top-level vault folder. |
 | `imports-books` | Source PDFs/EPUBs/etc. in `imports/books/`, either all or selected files | Keeps `imports/books/` directory. Does not remove ingested markdown; pair with `ingested-books` if desired. |
 | `imports-source-vault` | Contents of `imports/source-vault/` | Keeps `imports/source-vault/` directory. This removes legacy archive material used for migrations. |
 | `imports-5etools` | Contents of `imports/5etools/` | Keeps `imports/5etools/` directory if possible. Warn that canonical 5e lookup tools may stop working until the mirror is restored. |
 | `imports-all` | Contents of `imports/books/`, `imports/source-vault/`, and `imports/5etools/` | Keeps `imports/` and child directories. Warn about losing PDFs/archive and disabling local 5etools. |
 | `full-data-reset` | `vault-content` + `imports-all` + `all-index-caches` | Preserves all backbone folders/settings. Requires especially clear confirmation. |
-| `custom-paths` | Only explicitly listed paths under allowed data roots | Refuse paths outside `vault/`, `imports/`, `.qmd/`, or `.cache/`. |
+| `custom-paths` | Only explicitly listed paths under allowed data roots | Refuse paths outside `vault/`, `imports/`, or `.qmd/`. |
 
 Allowed data roots for deletion are only:
 
@@ -60,7 +59,6 @@ imports/books/
 imports/source-vault/
 imports/5etools/
 .qmd/
-.cache/                       # project-local tool caches (book-ingest etc.)
 ```
 
 Do not assume other `vault/*` folders are disposable. Inventory them and ask before touching them.
@@ -213,48 +211,18 @@ mkdir -p vault/library/books
 touch vault/library/books/.gitkeep
 ```
 
-### book-ingest cache
-
-`.cache/book-ingest/<source-hash>/` is project-local and gitignored. It
-holds Marker subprocess logs and (optionally, with `--keep-cache`) raw
-markdown/json artifacts. The canonical content always lives under
-`vault/library/books/<slug>/`, so wiping this cache is safe.
-
-For the entire cache:
-
-```bash
-set -euo pipefail
-cd /path/to/ttrpg-agent
-stamp=$(date +%Y%m%d-%H%M%S)
-manifest="/tmp/ttrpg-agent-cleanup-${stamp}-book-ingest-cache.txt"
-find .cache/book-ingest -mindepth 1 ! -name .gitkeep -print 2>/dev/null | sort > "$manifest"
-find .cache/book-ingest -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf -- {} +
-mkdir -p .cache/book-ingest
-printf 'Manifest: %s\n' "$manifest"
-```
-
-For a specific source hash (when the user knows the hash or you can
-look it up via `cat vault/library/books/<slug>/.ingest.json | jq -r .source_hash`):
-
-```bash
-hash="sha256-<sixty-four-hex-chars>"
-test -d ".cache/book-ingest/$hash" || { echo "no such cache"; exit 1; }
-rm -rf -- ".cache/book-ingest/$hash"
-```
-
-No qmd refresh needed — cache contents are not indexed.
-
 ### book-ingest backups
 
-Stale `.<slug>.<timestamp>.bak` directories appear under
-`vault/library/books/` when book-ingest is run with `--keep-backup` (or
-when `--keep-backup` ran in the past and was never cleaned). The leading
-dot keeps qmd from indexing them, but they still use disk.
+Stale `.<slug>.<timestamp>.bak` directories and
+`.<slug>.<timestamp>.bak.md` overview files appear under `vault/library/books/`
+when book-ingest is run with `--keep-backup` (or when backups from a failed/manual
+run were preserved). The leading dot keeps qmd from indexing them, but they
+still use disk.
 
 Inventory first:
 
 ```bash
-find vault/library/books -mindepth 1 -maxdepth 1 -type d -name '.*.bak' | sort
+find vault/library/books -mindepth 1 -maxdepth 1 \( -type d -name '.*.bak' -o -type f -name '.*.bak.md' \) | sort
 ```
 
 Drop all of them:
@@ -264,9 +232,9 @@ set -euo pipefail
 cd /path/to/ttrpg-agent
 stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-book-ingest-backups.txt"
-find vault/library/books -mindepth 1 -maxdepth 1 -type d -name '.*.bak' \
+find vault/library/books -mindepth 1 -maxdepth 1 \( -type d -name '.*.bak' -o -type f -name '.*.bak.md' \) \
   -print 2>/dev/null | sort > "$manifest"
-find vault/library/books -mindepth 1 -maxdepth 1 -type d -name '.*.bak' \
+find vault/library/books -mindepth 1 -maxdepth 1 \( -type d -name '.*.bak' -o -type f -name '.*.bak.md' \) \
   -exec rm -rf -- {} +
 printf 'Manifest: %s\n' "$manifest"
 ```
@@ -274,8 +242,8 @@ printf 'Manifest: %s\n' "$manifest"
 Drop a specific timestamped backup:
 
 ```bash
-target="vault/library/books/<slug>.<timestamp>.bak"
-test -d "$target" || { echo "no such backup"; exit 1; }
+target="vault/library/books/.<slug>.<timestamp>.bak"
+test -e "$target" || { echo "no such backup"; exit 1; }
 rm -rf -- "$target"
 ```
 

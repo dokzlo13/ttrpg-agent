@@ -1,162 +1,138 @@
 ---
 name: ttrpg-import-book-pdf
 description: |
-  Ingest a PDF book into the searchable vault library. Use when the user adds
-  a new PDF to imports/books/ and asks to "ingest", "add this book", "process
-  this PDF", or similar. Wraps .pi/cli/book-ingest.
+  End-to-end ingestion of a PDF book into the searchable vault library: PDF →
+  generated chapters → system classification → summaries → tags → qmd index.
+  Use when the user adds a PDF to imports/books/ and asks to "ingest", "add this
+  book", "process this PDF", or asks for tagging/summaries on an already-ingested
+  book. Wraps the .pi/cli/book-ingest CLI.
 ---
 
 # ttrpg-import-book-pdf
 
+Canonical pipeline doc. Drives the full path from a raw PDF in `imports/books/`
+to a tagged, qmd-indexed book under `vault/library/books/<slug>/`.
+
 ## When to use
 
-- User dropped a new PDF in `imports/books/` and says "ingest it" / "add this".
-- A previously-ingested book needs re-processing. Force a re-run with `--force`.
+- New PDF appeared in `imports/books/` and the user asked to ingest/add it.
+- Re-run on an existing slug — pass `--force` to override the source-hash skip.
+- Follow-on enrichment (classify-system, summarize, tag) on an already-ingested
+  book.
 
-**Don't use this for:** searching already-ingested content (use `ttrpg-library-search`),
-querying canonical 5e data (use `ttrpg-rules-5etools-query` / `query_5etools`),
-one-off handout conversion (use `ttrpg-import-raw-pdf`), or copying notes from the old vault
-(use `ttrpg-import-archive-vault`).
+**Don't use this for:** searching already-ingested content, canonical 5e data
+lookups, one-off handout conversion, or archive promotion.
 
-## Procedure
+## The flow
 
-1. Confirm the PDF exists at `imports/books/<filename>.pdf`.
-2. Check `vault/library/books/` for a matching slug. If `<slug>/.ingest.json`
-   exists with the same `source_hash` and `schema_version`, the tool will
-   skip unless `--force` is passed.
-3. Spawn the **ingest-worker** subagent with the PDF path. That subagent
-   runs:
+The CLI returns ordered `next_steps`. Run them in order. Don't invent omitted
+steps; don't second-guess what's emitted.
 
+1. Ingest:
    ```bash
-   uv run --project .pi/cli/book-ingest book-ingest imports/books/<filename>.pdf
-   # On a CUDA machine, force/tune if needed:
-   # uv run --project .pi/cli/book-ingest book-ingest imports/books/<filename>.pdf --device cuda
-   # LLM modes: --llm no|images-only|text-only|all
-   # For agent automation that prefers structured output:
-   # uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
+   uv run --project .pi/cli/book-ingest book-ingest --json imports/books/<filename>.pdf
    ```
+2. Read the JSON: `book_slug`, `overview_path`, `chapter_dir`, `section_count`,
+   `page_count`, `system`, `status`, `report_path`, `next_steps`.
+3. Execute every entry in `next_steps` in order. Each is either an informational
+   `review_findings` summary or a runnable `command`.
+4. Stop only on `status: failed` or unusable output. Continue on `review`; surface
+   findings to the user.
+5. Final `qmd update && qmd embed` is always emitted last.
 
-4. The tool writes generated reference output under
-   `vault/library/books/<book-slug>/`, separate from active notes in
-   `vault/notes/`:
+## What `next_steps` contains
 
-   - `_book.md` — book index with section TOC and frontmatter.
-   - `NN-<slug>.md` — one per planned section.
-   - `images/` — referenced images, with link paths rewritten in section bodies.
-   - `.ingest.json` — provenance (hash, schema, page count, plan source, system tag).
-   - `.ingest/manifest.json`, `quality.json`, `marker.json`, `agent-next.txt` —
-     sidecar metadata (qmd skips dot-directories).
+The CLI's emission rule is binary, by `OPENAI_API_KEY` presence:
 
-   Raw Marker artifacts and per-run logs go to `.cache/book-ingest/<hash>/`
-   (project-local, gitignored). The `logs/marker-<format>.log` files contain
-   subprocess stdout/stderr with the redacted command, return code, and
-   duration — useful when debugging poor extraction.
+| Key present | Steps emitted (in order) |
+|---|---|
+| ✅ | `classify_system`, `summarize --long-only`, `tag_book`, `qmd update && qmd embed` |
+| ❌ | `qmd update && qmd embed` only |
 
-5. After completion, read `.ingest/quality.json` if `quality_status` is
-   `review_required` or `failed`. Common warnings to surface to the user:
-   `empty_section_body`, `tiny_section`, `oversized_section`,
-   `broken_image_target`, `title_looks_like_ocr_noise`.
-6. Run `qmd update` and then `qmd embed` so the new content is searchable
-   and semantically retrievable. The ingester intentionally does not run
-   these itself; the calling agent does, after reviewing quality.
-7. Briefly confirm to the user: book title, section count, plan source
-   (`pdf-outline` / `marker-json` / `whole-book`), system tag (osr/5e/unknown),
-   output path, and whether embedding succeeded.
+`review_findings` is prepended only when the report has structural findings.
+Metered follow-ons are all-or-nothing: with a key, every metered step runs; no
+agent decisions in the happy path.
+
+When the key is absent and the user still wants tags, load
+**`ttrpg-tag-book-manual`** and best-effort tag chapter-by-chapter via
+`book-ingest tag-manual`.
+
+## Output layout
+
+```text
+vault/library/books/
+└── <book-slug>/
+    ├── __<book-slug>.md       # overview / TOC, visible first in Obsidian
+    ├── NN-<section>.md        # chapters
+    ├── images/
+    └── .ingest/
+        ├── provenance.json    # source hash, system, run config, quality_status
+        └── report.json        # validation + Marker/LLM/follow-on observability
+```
+
+Generated chapters use `# Title`, chapter text, then a final `---` nav footer
+with full-vault wikilinks. The overview gets deterministic `book-index`/`toc`
+metadata and is skipped by chapter summarize/tag follow-ons. Image descriptions
+appear as `> [!image] AI description` callouts — AI retrieval aids, not book
+prose.
+
+## Ingest LLM modes (Marker SDK)
+
+Resolution order: CLI `--llm` → `TTRPG_MARKER_LLM_MODE` → `no`.
+
+| Mode | When to use | Cost |
+|---|---|---|
+| `no` | Fastest local ingest, smoke runs | No API calls |
+| `images-only` | Searchable image captions | Image-description calls only |
+| `text-only` | Poor OCR/layout/tables/headers | Full Marker text cleanup, no captions |
+| `all` | Best quality with captions | Slowest; full cleanup + captions |
+
+Anything other than `no` requires `OPENAI_API_KEY`. For partial smokes:
+`--llm no --page-range 0-5`.
+
+## The metered follow-ons
+
+All require `OPENAI_API_KEY`; missing key prints a skip message and exits 0.
+
+- **`classify-system <slug>`** — bounded LLM read of front/back matter; writes
+  `system`/`systems`/`system_source: llm`/`system_confidence`/`system_rationale`
+  to `provenance.json` and `system/<name>` Obsidian tags to chapter and overview
+  frontmatter. Refreshes overview.
+- **`summarize <slug> --long-only`** — only summarizes chapters too long for
+  the tagger's full-text call (default cutoff 18000 body chars,
+  `TTRPG_TAG_FULL_CHAPTER_CHARS` overrides). Writes `summary`/`summary_for`.
+  This is the form `next_steps` emits; plain `summarize <slug>` summarizes every
+  chapter and is rarely needed.
+- **`tag <slug>`** — sends complete small chapters as full text; uses the
+  detailed `summary` for long chapters. Writes Obsidian-native `tags`/`tags_for`.
+  Preserves `book/*` and `system/*`. If the LLM returns no usable tags, writes
+  an empty content-tag set — never invents heuristic tags. Refreshes overview.
+
+Frontmatter stamps (`summary_for`, `tags_for`) are body-hash-based, so reruns
+skip unchanged chapters and changes correctly invalidate downstream stamps.
 
 ## Re-running validation
-
-If the user manually edits a book directory or a stale ingest needs a
-fresh quality report:
 
 ```bash
 uv run --project .pi/cli/book-ingest book-ingest validate \
   vault/library/books/<book-slug>
 ```
 
-This rewrites `.ingest/quality.json` without re-running Marker.
+Rewrites `.ingest/report.json` without re-running Marker, preserving follow-on
+observability blocks.
 
-## `--llm` modes
+## Failure handling
 
-Preferred flag: `--llm no|images-only|text-only|all`. Resolution order:
-CLI `--llm` → `TTRPG_MARKER_LLM_MODE` → legacy `--use-llm`/`--describe-images`
-flags/env → `no`.
-
-| Mode | Use when | Cost/behavior |
-|---|---|---|
-| `no` | fastest local ingest | no API calls; image files still copied |
-| `images-only` | user wants images searchable | normal Marker extraction plus `LLMImageDescriptionProcessor` only on the Markdown pass; roughly one vision call per detected Picture/Figure |
-| `text-only` | OCR/layout/table/header quality is poor | full Marker LLM cleanup, no image captions; can be hundreds/thousands of calls |
-| `all` | quality-first and image captions are both wanted | slowest; full LLM cleanup plus image captions |
-
-For image discoverability ("find the bronze medal", "where's the dungeon
-map"), prefer:
-
-```bash
-uv run --project .pi/cli/book-ingest book-ingest \
-  --llm images-only imports/books/<filename>.pdf
-```
-
-The image file is still saved; only a description paragraph is added to the
-section body. `--describe-images` remains as a deprecated alias and maps to
-`images-only` unless combined with `--use-llm`, which maps to `all`.
-
-When any LLM mode other than `no` is on, ensure `OPENAI_API_KEY` is set in
-`.env`. The wrapper writes a 0600-mode temp config rather than putting the key
-on the command line. Check provenance with:
-
-```bash
-cat <book>/.ingest/marker.json | jq '.runs[].llm'
-```
-
-## Why links matter
-
-Section frontmatter is useful for filtering, but Obsidian graph quality
-comes from body links. Don't remove the generated `_book.md` ↔ section
-links or the previous/next chain in section files; they are intentional.
-
-When active campaign notes link back to an ingested book, the book index file is
-`_book.md`, not `<book-slug>.md`. To avoid broken or ambiguous links, use a
-path-qualified Obsidian link from the vault root:
-
-```markdown
-[[library/books/<book-slug>/_book|Readable Book Title]]
-```
-
-Do not invent links like `[[the-pit-in-the-forest]]` unless an active stub with
-that filename actually exists.
-
-## GPU / performance
-
-Marker auto-selects CUDA when its PyTorch install sees a CUDA GPU. If you
-need to force or tune:
-
-```bash
-uv run --project .pi/cli/book-ingest book-ingest imports/books/<file>.pdf \
-  --device cuda \
-  --layout-batch-size 8 \
-  --detection-batch-size 8 \
-  --recognition-batch-size 128
-```
-
-If marker runs out of VRAM, lower or omit the batch sizes.
-
-## Failure modes
-
-- **Marker missing / wrong version**: tell the user to install marker per
-  `.pi/cli/book-ingest/README.md`.
-- **Hash + schema match, no `--force`**: report the skip; this is normal idempotence.
-- **`schema_version` mismatch**: tool auto-forces re-ingest with a warning.
-- **Quality status `failed`**: a section file or `_book.md` is missing.
-  Inspect `.ingest/quality.json` and consider re-running with `--force-ocr`
-  or `--llm text-only` / `--llm all` only when the user accepts the slow,
-  metered LLM pass.
-- **OSR detected** (`system: osr`): don't auto-convert. Flag it so the user
-  can decide to run `/convert-monster`.
-
-## Common chain
-
-`ttrpg-import-book-pdf` → `ingest-worker` → inspect `.ingest/quality.json` if needed → `qmd update` → `qmd embed`.
+- **Bad PDF / unreadable**: surface the ClickException; suggest the user verify
+  the file.
+- **OOM / timeout**: try `--page-range` for a smaller slice, or smaller batch
+  sizes (`--layout-batch-size 4`, etc.).
+- **`status: failed`**: read `.ingest/report.json` and surface top findings.
+- **LLM mode requested but no key**: add `OPENAI_API_KEY` or rerun with
+  `--llm no`.
+- **qmd embed CUDA OOM**: retry with `QMD_LLAMA_GPU=false qmd embed`.
 
 ## Reference
 
-CLI contract: `.pi/cli/book-ingest/README.md`.
+Full CLI contract, flags, JSON shape, env variables, and report fields:
+`.pi/cli/book-ingest/README.md`.
