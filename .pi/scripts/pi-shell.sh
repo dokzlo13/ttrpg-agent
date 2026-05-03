@@ -28,7 +28,17 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
 fi
 
 export QMD_CONFIG_DIR="$PROJECT_ROOT/.qmd"
-export XDG_CACHE_HOME="$PROJECT_ROOT/.qmd"
+# qmd stores its SQLite index under XDG_CACHE_HOME/qmd, so keep XDG_CACHE_HOME
+# at .qmd for project-local rebuildable index state. Heavyweight reusable
+# models/caches are real directories under .cache and are exposed to tools via
+# env vars and symlinks (.qmd/datalab -> .cache/datalab,
+# .qmd/qmd/models -> .cache/qmd/models). Thus .qmd wipeouts remove only
+# rebuildable state/symlinks, not the model payloads.
+export TTRPG_CACHE_DIR="${TTRPG_CACHE_DIR:-$PROJECT_ROOT/.cache}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$QMD_CONFIG_DIR}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$TTRPG_CACHE_DIR/uv}"
+export HF_HOME="${HF_HOME:-$TTRPG_CACHE_DIR/huggingface}"
+export TORCH_HOME="${TORCH_HOME:-$TTRPG_CACHE_DIR/torch}"
 # Prefer NVIDIA's WSL CUDA toolkit over Ubuntu's old nvidia-cuda-toolkit package
 # when node-llama-cpp has to compile a local CUDA backend.
 if [ -x /usr/local/cuda/bin/nvcc ]; then
@@ -56,9 +66,13 @@ export GGML_CUDA_NO_VMM="${GGML_CUDA_NO_VMM:-1}"
 
 mkdir -p \
   "$QMD_CONFIG_DIR" \
-  "$QMD_CONFIG_DIR/datalab/models" \
-  "$QMD_CONFIG_DIR/qmd/models" \
-  "$QMD_CONFIG_DIR/uv" \
+  "$QMD_CONFIG_DIR/qmd" \
+  "$TTRPG_CACHE_DIR" \
+  "$TTRPG_CACHE_DIR/datalab/models" \
+  "$TTRPG_CACHE_DIR/qmd/models" \
+  "$UV_CACHE_DIR" \
+  "$HF_HOME" \
+  "$TORCH_HOME" \
   "$TTRPG_IMPORTS_DIR/fvtt-data" \
   "$TTRPG_BOOKS_DIR" \
   "$TTRPG_SOURCE_VAULT_DIR" \
@@ -68,6 +82,16 @@ mkdir -p \
   "$PROJECT_ROOT/vault/notes/mechanics" \
   "$PROJECT_ROOT/vault/notes/readalouds" \
   "$TTRPG_LIBRARY_DIR"
+
+# Persistent model/cache symlinks. If a previous cleanup removed .qmd contents,
+# recreate links; if old real directories exist, leave them for explicit
+# migration rather than deleting data here.
+if [ ! -e "$QMD_CONFIG_DIR/datalab" ]; then
+  ln -s "$TTRPG_CACHE_DIR/datalab" "$QMD_CONFIG_DIR/datalab"
+fi
+if [ ! -e "$QMD_CONFIG_DIR/qmd/models" ]; then
+  ln -s "$TTRPG_CACHE_DIR/qmd/models" "$QMD_CONFIG_DIR/qmd/models"
+fi
 
 _pi_qmd_collection_path() {
   command qmd collection show "$1" 2>/dev/null | awk '/Path:/ {print $2; exit}'

@@ -46,7 +46,8 @@ skills when creating durable active-vault content.
 | Path | Read? | Write? | Purpose |
 |---|---:|---:|---|
 | `.pi/` | yes | sparingly | Project machinery: skills, prompts, agents, CLI tools. |
-| `.qmd/` | no | qmd/system skills | Rebuildable qmd index/cache/config state. |
+| `.qmd/` | no | qmd/system skills | Rebuildable qmd index/config state. |
+| `.cache/` | no | tooling only | Persistent project-local qmd/Marker/HuggingFace/torch/uv model/cache state; preserve across qmd/ingest wipeouts. |
 | `imports/books/` | file list/input only | no | Raw books supplied by the user. |
 | `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
 | `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports. |

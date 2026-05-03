@@ -15,7 +15,7 @@ Do **not** delete anything just because this prompt was invoked.
 
 1. Determine the intended scope from the user's input, if possible:
    - `search-index` — qmd search index only
-   - `all-index-caches` — all `.qmd/` caches
+   - `all-index-caches` — all rebuildable `.qmd/` config/index state; preserves persistent `.cache/` model caches
    - `active-notes` — `vault/notes/` or selected note markdown
    - `ingested-books` — generated folders in `vault/library/books/`
    - `vault-content` — active vault content, preserving `vault/.obsidian/`

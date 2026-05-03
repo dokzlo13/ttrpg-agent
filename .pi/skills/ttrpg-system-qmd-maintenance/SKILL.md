@@ -22,7 +22,7 @@ non-overlapping collections:
 | `books` | `vault/library/books/` generated book-ingest output |
 | `archive` | `imports/source-vault/` optional legacy notes, excluded from default queries |
 
-There is no generated qmd vault mirror. `.qmd/` is rebuildable qmd config/cache/index state.
+There is no generated qmd vault mirror. `.qmd/` is rebuildable qmd config/index state. Reusable qmd/Marker/HuggingFace/torch/uv model caches live under project-local `.cache/` and should survive normal qmd/index wipeouts.
 
 ## Normal refresh
 
@@ -84,8 +84,8 @@ qmd status
 
 Notes:
 
-- This preserves `.qmd/uv/` and other non-qmd cache data.
-- It may re-download/rebuild qmd models if qmd's model cache is removed.
+- This preserves project-local `.cache/` model/cache data.
+- It should not re-download/rebuild qmd or Marker models unless `.cache/` was manually removed outside normal maintenance.
 - If semantic search is not needed immediately, skip `qmd embed` and mention that vectors are stale/missing.
 
 ## Index cleanup for broader data cleanup
@@ -97,10 +97,9 @@ protected paths. This skill is for qmd health and rebuilds, not broad deletion.
 For qmd specifically:
 
 - **Search-index cleanup** deletes only `.qmd/qmd/`.
-  This is the preferred destructive qmd reset because it preserves uv/datalab/model caches.
+  This is the preferred destructive qmd reset and preserves `.cache/` uv/datalab/qmd model caches.
 - **All-index-caches cleanup** deletes the contents of `.qmd/`.
-  Use only when the user explicitly wants all local index/cache state removed; this may force
-  model/cache re-downloads. It still must not touch `.pi/cli/` or `.pi/scripts/`.
+  This removes rebuildable qmd config/index state but still preserves `.cache/`; it should not force model re-downloads. It still must not touch `.pi/cli/`, `.pi/scripts/`, or `.cache/`.
 - After deleting vault notes, ingested books, or archive imports, run `qmd update` so deleted docs
   disappear from search results.
 - After deleting ingested books without re-ingesting, `qmd embed` is usually unnecessary.

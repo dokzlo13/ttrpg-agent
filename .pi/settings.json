@@ -45,5 +45,5 @@
     }
   },
   "shellCommandPrefix": "source ./.pi/scripts/pi-shell.sh",
-  "_envOverrides": "The bash tool sources ./.pi/scripts/pi-shell.sh via shellCommandPrefix. That script sets TTRPG_* paths, sources project .env for optional feature/API keys, sets QMD_CONFIG_DIR, XDG_CACHE_HOME, and QMD_LLAMA_GPU, and makes plain `qmd ...` commands project-local with lazy bootstrap. .pi/scripts/pi-launch.sh and .pi/scripts/pi-isolated.sh apply the same env for direct/manual qmd use. Don't put secrets in settings.json; pi only does deep merge on JSON."
+  "_envOverrides": "The bash tool sources ./.pi/scripts/pi-shell.sh via shellCommandPrefix. That script sets TTRPG_* paths, sources project .env for optional feature/API keys, keeps qmd config/index state project-local under .qmd, keeps reusable model/cache state under .cache, sets QMD_LLAMA_GPU, and makes plain `qmd ...` commands project-local with lazy bootstrap. .pi/scripts/pi-launch.sh and .pi/scripts/pi-isolated.sh apply the same env for direct/manual qmd use. Don't put secrets in settings.json; pi only does deep merge on JSON."
 }

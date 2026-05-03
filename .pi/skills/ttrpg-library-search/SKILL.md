@@ -106,7 +106,7 @@ user might need to ingest the relevant book.
 
 ## Index location & freshness
 
-The index lives at `.qmd/`. Inside pi, plain `qmd` commands are made
+The index lives at `.qmd/`. Reusable qmd/Marker models and other heavyweight caches live under project-local `.cache/` and should not be removed during normal qmd/index wipeouts. Inside pi, plain `qmd` commands are made
 project-local automatically via `shellCommandPrefix` loading `.pi/scripts/pi-shell.sh`.
 After ingesting a book or making large note edits, run `qmd update` to refresh
 the index.

@@ -61,7 +61,7 @@ it's intermediate. The proper destination for ingested content is
 
 Marker's PyTorch install auto-selects CUDA when `torch.cuda.is_available()` is true.
 For direct marker calls, force CUDA with `TORCH_DEVICE=cuda`. For normal book ingestion,
-prefer `book-ingest --device cuda` so provenance captures the setting.
+prefer `book-ingest --device cuda` so provenance captures the setting. The project shell routes Marker/qmd/HuggingFace/torch caches to project-local `.cache/`; preserve that cache across `.qmd/` wipeouts.
 
 ## Limitations to flag
 

@@ -8,9 +8,11 @@ vault/
 imports
 imports/
 
-# qmd/config/cache state — rebuildable from vault/imports.
+# qmd config/index state — rebuildable from vault/imports.
 .qmd/
-# Project-local caches (book-ingest raw artifacts, lint/test caches, etc).
+# Project-local persistent caches (Marker/qmd/HuggingFace/torch/uv models,
+# book-ingest raw artifacts, lint/test caches, etc). Do not wipe during normal
+# qmd/index cleanup.
 .cache/
 .pytest_cache/
 .mypy_cache/

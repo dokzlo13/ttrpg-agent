@@ -45,9 +45,12 @@ mkdir -p \
   imports/source-vault \
   imports/5etools \
   imports/fvtt-data \
-  .qmd/datalab/models \
-  .qmd/qmd/models \
-  .qmd/uv
+  .qmd/qmd \
+  .cache/datalab/models \
+  .cache/qmd/models \
+  .cache/uv \
+  .cache/huggingface \
+  .cache/torch
 ```
 
 ## Cleanup scopes
@@ -56,8 +59,8 @@ When the user has not chosen a precise scope, offer these options:
 
 | Scope | Deletes | Preserves / notes |
 |---|---|---|
-| `search-index` | `.qmd/qmd/` contents | Keeps qmd container structure. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. |
-| `all-index-caches` | Contents of `.qmd/` | Keeps `.qmd/` directory. May force model/cache re-downloads. Does **not** touch `.pi/cli/`. |
+| `search-index` | `.qmd/qmd/` contents | Keeps qmd container structure. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. Preserves `.cache/` model caches. |
+| `all-index-caches` | Contents of `.qmd/` | Keeps `.qmd/` directory. This removes rebuildable qmd config/index state only. It **must preserve `.cache/`** so qmd/Marker/HuggingFace/torch/uv models are not re-downloaded. Does **not** touch `.pi/cli/`. |
 | `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. |
 | `ingested-books` | Generated book folders under `vault/library/books/`, either all or selected slugs | Keeps `vault/library/books/` directory. Does not delete source PDFs in `imports/books/`. |
 | `book-ingest-backups` | Stale `.<slug>.<timestamp>.bak` directories and `.<slug>.<timestamp>.bak.md` overview backups under `vault/library/books/` | Keeps current ingested content. These appear when book-ingest runs with `--keep-backup`. |
@@ -82,6 +85,8 @@ imports/5etools/
 imports/fvtt-data/
 .qmd/
 ```
+
+`.cache/` is intentionally not an allowed cleanup root in this skill. It holds reusable project-local qmd/Marker/HuggingFace/torch/uv model caches and should survive normal index, ingest, vault, and full-data resets.
 
 Do not assume other `vault/*` folders are disposable. Inventory them and ask before touching them.
 
@@ -121,6 +126,7 @@ After every destructive block, run a separate verification command such as:
 cd /path/to/ttrpg-agent
 find vault -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
 find .qmd -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
+find .cache -maxdepth 3 -mindepth 1 -type d -print 2>/dev/null | sort
 find imports -maxdepth 2 -mindepth 1 -type d -print 2>/dev/null | sort
 ```
 
@@ -131,7 +137,8 @@ mkdir -p \
   vault/notes vault/notes/images vault/notes/mechanics vault/notes/readalouds \
   vault/library/books \
   imports/books imports/source-vault imports/5etools imports/fvtt-data \
-  .qmd/datalab/models .qmd/qmd/models .qmd/uv
+  .qmd/qmd \
+  .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
 ```
 
 ### Search index only
@@ -145,7 +152,7 @@ find .qmd/qmd -mindepth 1 -print 2>/dev/null | sort > "$manifest" || true
 if [ -d .qmd/qmd ]; then
   find .qmd/qmd -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 fi
-mkdir -p .qmd/qmd/models
+mkdir -p .qmd/qmd .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -168,7 +175,7 @@ stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-all-index-caches.txt"
 find .qmd -mindepth 1 -print 2>/dev/null | sort > "$manifest" || true
 find .qmd -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-mkdir -p .qmd/datalab/models .qmd/qmd/models .qmd/uv
+mkdir -p .qmd/qmd .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -330,7 +337,7 @@ Run the individual blocks, not a single `rm -rf vault imports .qmd`. Recreate th
 ```bash
 mkdir -p vault/notes vault/notes/images vault/notes/mechanics vault/notes/readalouds vault/library/books
 mkdir -p imports/books imports/source-vault imports/5etools imports/fvtt-data
-mkdir -p .qmd/datalab/models .qmd/qmd/models .qmd/uv
+mkdir -p .qmd/qmd .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
 ```
 
 ## Post-cleanup qmd handling

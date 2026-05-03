@@ -20,6 +20,7 @@ export PI_CODING_AGENT_DIR="$ISOLATED_HOME"
 
 echo "→ Running pi in isolated mode" >&2
 echo "  QMD_CONFIG_DIR      = $QMD_CONFIG_DIR" >&2
+echo "  TTRPG_CACHE_DIR     = $TTRPG_CACHE_DIR" >&2
 echo "  PI_CODING_AGENT_DIR = $PI_CODING_AGENT_DIR" >&2
 
 exec pi "$@"

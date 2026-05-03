@@ -90,6 +90,8 @@ Resolution order: CLI `--llm` → `TTRPG_MARKER_LLM_MODE` → `no`.
 Anything other than `no` requires `OPENAI_API_KEY`. For partial smokes:
 `--llm no --page-range 0-5`.
 
+`.pi/scripts/pi-shell.sh` keeps Marker/qmd/HuggingFace/torch/uv model caches under project-local `.cache/`; qmd config/index state is stored separately under `.qmd/`.
+
 ## The metered follow-ons
 
 All require `OPENAI_API_KEY`; missing key prints a skip message and exits 0.

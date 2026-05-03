@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# pi-launch.sh — start pi with qmd pinned to the project, not ~/.cache.
+# pi-launch.sh — start pi with qmd pinned to the project and reusable caches
+# under project-local .cache, not the user's global ~/.cache.
 #
 # Use this by default. The agent's settings (.pi/settings.json) and skills are
 # already project-local; this script also localizes qmd for any direct/manual

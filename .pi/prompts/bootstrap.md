@@ -12,7 +12,7 @@ Hard rules:
 
 - Start with the welcome message in step 1.
 - Never print secrets. Do not paste `.env` contents back to the user if keys may be present.
-- `.env` is allowed to be created/edited. `imports/`, `vault/`, and `.qmd/` are ignored local data areas.
+- `.env` is allowed to be created/edited. `imports/`, `vault/`, `.qmd/`, and `.cache/` are ignored local data areas. `.cache/` is persistent model/cache storage and should not be wiped during ordinary qmd/index cleanup.
 - Do not edit `imports/source-vault/` source files after they are copied/imported; treat it as read-only archive material.
 - Do not ingest books, generate images, run paid LLM Marker modes, clone 5etools, or copy a private vault without user approval.
 - Run bootstrap as a **guided step-by-step wizard**, not a giant questionnaire. Ask only the questions needed for the current section, perform the approved actions for that section, summarize the result, then move to the next section.
@@ -216,7 +216,7 @@ Use the `.env` Marker defaults. If CUDA was configured and the user approved tun
 Ensure skeleton directories exist:
 
 ```bash
-mkdir -p imports/books imports/source-vault imports/5etools vault/notes vault/library/books vault/notes/images .qmd
+mkdir -p imports/books imports/source-vault imports/5etools vault/notes vault/library/books vault/notes/images .qmd .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
 ```
 
 Run smoke tests appropriate to enabled features:

@@ -53,7 +53,8 @@ ttrpg-agent/
 │   ├── extensions/            # project-local pi extensions, incl. query_5etools and vault_frontmatter
 │   ├── scripts/               # launch/qmd environment wrappers
 │   └── cli/                   # uv-managed helper CLIs
-├── .qmd/                      # ignored qmd config/cache/index/model state
+├── .qmd/                      # ignored qmd config/index state (rebuildable)
+├── .cache/                    # ignored project-local persistent model/cache state
 ├── imports/                   # ignored raw inputs/reference mirrors
 │   ├── books/                 # source PDFs/EPUBs
 │   ├── source-vault/          # optional old vault; treated read-only
@@ -63,7 +64,7 @@ ttrpg-agent/
     └── library/books/         # generated book-ingest output
 ```
 
-`vault/notes/` is the main writing surface. `vault/library/books/` is generated reference material. `imports/` is input/reference data. `.qmd/` is rebuildable qmd state.
+`vault/notes/` is the main writing surface. `vault/library/books/` is generated reference material. `imports/` is input/reference data. `.qmd/` is rebuildable qmd config/index state. `.cache/` stores heavyweight reusable qmd/Marker/HuggingFace/torch/uv caches and should survive normal qmd or ingest wipeouts.
 
 ---
 
@@ -289,7 +290,7 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 
 ### `.pi/scripts/`
 
-- `pi-shell.sh` — shared shell setup. Exports `TTRPG_*` paths, sources project `.env` for optional feature/API keys, sets `QMD_CONFIG_DIR`, `XDG_CACHE_HOME`, CUDA/qmd fallback vars, creates skeleton directories, and wraps `qmd` so it is project-local.
+- `pi-shell.sh` — shared shell setup. Exports `TTRPG_*` paths, sources project `.env` for optional feature/API keys, keeps qmd config/index state project-local under `.qmd`, keeps reusable model/cache state under `.cache`, sets CUDA/qmd fallback vars, creates skeleton directories, and wraps `qmd` so it is project-local.
 - `pi-launch.sh` — normal launcher; keeps your global pi config but localizes qmd.
 - `pi-isolated.sh` — full pi isolation via `PI_CODING_AGENT_DIR=.pi-home`.
 - `qmd-init.sh` — thin `qmd update` helper with the project shell setup.
@@ -311,7 +312,8 @@ Ignored/local:
 - `.env`, `.env.*` except `.env.example`
 - `vault/` — Obsidian vault, active campaign notes, generated images, ingested book output. This may be a real local directory or a symlink to a Windows-accessible vault.
 - `imports/` — source PDFs, legacy vault, Foundry exports, 5etools clone, and other local inputs.
-- `.qmd/` — qmd config/cache/index/model state
+- `.qmd/` — rebuildable qmd config/index state
+- `.cache/` — persistent project-local qmd/Marker/HuggingFace/torch/uv model/cache state
 - `.cache/`, `.trash/`, test caches, virtualenvs, node_modules
 - `.pi/npm/`, `.pi/git/`, `.pi-home/` — project-local pi runtime/package caches
 

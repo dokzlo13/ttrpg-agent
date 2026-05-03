@@ -24,7 +24,8 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 | `imports/source-vault/` | yes | **no** | Legacy archive; promote via `ttrpg-import-archive-vault`. |
 | `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports; preserve raw JSON/TXT/ZIP unless the user asks to clean it. |
 | `imports/5etools/` | yes | no | Canonical 5e data mirror. Prefer `query_5etools` for creatures/spells/items. |
-| `.qmd/` | no | only qmd/system skills | Rebuildable search index/cache. |
+| `.qmd/` | no | only qmd/system skills | Rebuildable qmd config/search index. |
+| `.cache/` | no | tooling only | Project-local persistent qmd/Marker/HuggingFace/torch/uv model/cache data; preserve across qmd/ingest wipeouts. |
 
 Never edit `imports/source-vault/`, raw books, 5etools data, or hand-edit
 `vault/library/books/` chapter output.
