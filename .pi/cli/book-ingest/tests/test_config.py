@@ -2,6 +2,7 @@ from book_ingest.config import (
     LLMConfig,
     parse_dotenv,
     parse_llm_mode,
+    parse_non_negative_float_env,
     parse_positive_int_env,
     resolve_llm_config,
     resolve_llm_mode,
@@ -15,7 +16,9 @@ QUOTED="quoted value"
 SINGLE='single value'
 EXPORTED=exported
 # comment line
-TRAILING=trail # not a comment marker inside value
+TRAILING=trail # comment
+HASHED="value # not a comment inside quotes"
+EXPANDED=${KEY}
 """
     out = parse_dotenv(text)
     assert out["KEY"] == "value"
@@ -23,6 +26,8 @@ TRAILING=trail # not a comment marker inside value
     assert out["SINGLE"] == "single value"
     assert out["EXPORTED"] == "exported"
     assert out["TRAILING"] == "trail"
+    assert out["HASHED"] == "value # not a comment inside quotes"
+    assert out["EXPANDED"] == "${KEY}"
 
 
 def test_parse_dotenv_export_prefix():
@@ -74,6 +79,7 @@ def test_resolve_llm_config_default_off():
     assert cfg.mode == "no"
     assert cfg.api_key is None
     assert cfg.max_concurrency == 2
+    assert cfg.min_interval_seconds == 2.0
 
 
 def test_parse_positive_int_env():
@@ -81,6 +87,14 @@ def test_parse_positive_int_env():
     assert parse_positive_int_env("0", default=2) == 2
     assert parse_positive_int_env("nope", default=2) == 2
     assert parse_positive_int_env(None, default=2) == 2
+
+
+def test_parse_non_negative_float_env():
+    assert parse_non_negative_float_env("1.5", default=2.0) == 1.5
+    assert parse_non_negative_float_env("0", default=2.0) == 0.0
+    assert parse_non_negative_float_env("-1", default=2.0) == 2.0
+    assert parse_non_negative_float_env("nope", default=2.0) == 2.0
+    assert parse_non_negative_float_env(None, default=2.0) == 2.0
 
 
 def test_parse_llm_mode_accepts_only_current_modes():
@@ -142,6 +156,17 @@ def test_resolve_llm_config_uses_env_max_concurrency():
         llm_mode="no",
     )
     assert cfg.max_concurrency == 4
+
+
+def test_resolve_llm_config_uses_env_min_interval():
+    cfg = resolve_llm_config(
+        cli_model=None,
+        cli_base_url=None,
+        env={"TTRPG_MARKER_LLM_MIN_INTERVAL_SECONDS": "1.25"},
+        llm_mode="images-only",
+    )
+    assert cfg.min_interval_seconds == 1.25
+    assert cfg.min_interval_source == "env"
 
 
 def test_llm_config_redacted_omits_secret():

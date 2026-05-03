@@ -83,6 +83,9 @@ def _format_run_status(
     if llm.enabled:
         parts.append(_sourced("llm.model", llm.model, llm.model_source))
         parts.append(_sourced("llm.concurrency", llm.max_concurrency, llm.max_concurrency_source))
+        parts.append(
+            _sourced("llm.min_interval", llm.min_interval_seconds, llm.min_interval_source)
+        )
     parts.append(_sourced("device", device, device_source))
     cuda = str(torch_status.get("cuda_available")).lower()
     parts.append(f"torch.cuda={cuda}")
@@ -341,6 +344,7 @@ def cmd_ingest(
         openai_model=llm.model,
         openai_base_url=llm.base_url,
         max_concurrency=llm.max_concurrency,
+        llm_min_interval_seconds=llm.min_interval_seconds,
         layout_batch_size=layout_batch_size,
         detection_batch_size=detection_batch_size,
         recognition_batch_size=recognition_batch_size,

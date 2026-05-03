@@ -45,6 +45,7 @@ class ConvertOptions:
     openai_model: str
     openai_base_url: str
     max_concurrency: int
+    llm_min_interval_seconds: float = 2.0
     layout_batch_size: int | None = None
     detection_batch_size: int | None = None
     recognition_batch_size: int | None = None
@@ -94,12 +95,18 @@ class ObservableOpenAIService:  # resolved by Marker via full import path
     failures because the precise exception type is no longer available.
     """
 
+    _request_lock = Lock()
+    _next_request_at = 0.0
+
     def __init__(self, config: Any = None) -> None:
         from marker.services.openai import OpenAIService
 
         self._inner = OpenAIService(config=config)
         self.calls: list[dict[str, Any]] = []
         self._lock = Lock()
+        self._min_interval_seconds = _config_float(
+            config, "book_ingest_llm_min_interval_seconds", 2.0
+        )
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
@@ -116,6 +123,7 @@ class ObservableOpenAIService:  # resolved by Marker via full import path
         block_id = _block_id(block)
         image_name = _image_filename_from_block_id(block_id)
         try:
+            self._throttle()
             out = self._inner(
                 prompt,
                 image,
@@ -147,9 +155,34 @@ class ObservableOpenAIService:  # resolved by Marker via full import path
             )
         return out
 
+    def _throttle(self) -> None:
+        if self._min_interval_seconds <= 0:
+            return
+        with self._request_lock:
+            now = time.monotonic()
+            wait = self._next_request_at - now
+            if wait > 0:
+                time.sleep(wait)
+                now = time.monotonic()
+            type(self)._next_request_at = now + self._min_interval_seconds
+
     def _append(self, record: dict[str, Any]) -> None:
         with self._lock:
             self.calls.append(record)
+
+
+def _config_float(config: Any, key: str, default: float) -> float:
+    if isinstance(config, dict):
+        value = config.get(key)
+    else:
+        value = getattr(config, key, None)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
 
 
 def _useful_warning(message: str) -> bool:
@@ -243,6 +276,7 @@ def _build_marker_config(opts: ConvertOptions) -> dict[str, Any]:
                 "openai_model": opts.openai_model,
                 "openai_base_url": opts.openai_base_url,
                 "max_concurrency": opts.max_concurrency,
+                "book_ingest_llm_min_interval_seconds": opts.llm_min_interval_seconds,
             }
         )
         if opts.llm_mode == "images-only":

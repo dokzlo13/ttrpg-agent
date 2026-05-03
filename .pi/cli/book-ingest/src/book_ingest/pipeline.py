@@ -283,7 +283,7 @@ def ingest_pdf(
             page_count = max((p.get("page_id", -1) for p in converted.page_stats), default=-1) + 1
 
         book_title = book_title_from(pdf)
-        plans, plan_source = plan_sections(
+        plans, plan_source, planning_diag = plan_sections(
             pdf, converted.table_of_contents, page_count, book_title, markdown_text
         )
         system = _system_tag(markdown_text)
@@ -375,6 +375,7 @@ def ingest_pdf(
             stats=stats,
             extra_findings=extra_findings,
         )
+        report["planning"] = planning_diag
         (ingest_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
         provenance = {

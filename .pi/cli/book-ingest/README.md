@@ -278,7 +278,9 @@ correctly. `summary_for` stamps `body_hash` alone.
 
 When an LLM mode other than `no` resolves, `OPENAI_API_KEY` must be set. The
 key is passed in-memory through Marker SDK config and never written to a log.
-`TTRPG_MARKER_LLM_MAX_CONCURRENCY` controls LLM request concurrency.
+`TTRPG_MARKER_LLM_MAX_CONCURRENCY` controls LLM request concurrency, and
+`TTRPG_MARKER_LLM_MIN_INTERVAL_SECONDS` (default `2.0`) spaces requests to reduce
+image-caption TPM rate-limit bursts.
 
 ## Quality gates
 

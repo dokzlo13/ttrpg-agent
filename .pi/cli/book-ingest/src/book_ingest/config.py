@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
+
+from dotenv import dotenv_values
 
 
 def find_project_root(start: Path | None = None) -> Path:
@@ -14,33 +16,20 @@ def find_project_root(start: Path | None = None) -> Path:
     return Path.cwd().resolve()
 
 
-_DOTENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
-
-
 def parse_dotenv(text: str) -> dict[str, str]:
-    """Minimal dotenv parser. Supports KEY=value, KEY="value", KEY='value', export KEY=value, # comments."""
-    out: dict[str, str] = {}
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0]
-        if not line.strip():
-            continue
-        m = _DOTENV_LINE.match(line)
-        if not m:
-            continue
-        key, val = m.group(1), m.group(2)
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in {'"', "'"}:
-            val = val[1:-1]
-        out[key] = val
-    return out
+    """Parse dotenv text using python-dotenv without mutating process env."""
+    parsed = dotenv_values(stream=StringIO(text), interpolate=False)
+    return {str(key): value for key, value in parsed.items() if value is not None}
 
 
 def load_dotenv_into(env: dict[str, str], dotenv_path: Path) -> None:
     """Load dotenv values into ``env`` without overwriting existing keys."""
     if not dotenv_path.is_file():
         return
-    parsed = parse_dotenv(dotenv_path.read_text(encoding="utf-8", errors="replace"))
+    parsed = dotenv_values(dotenv_path=dotenv_path, interpolate=False, encoding="utf-8")
     for k, v in parsed.items():
-        env.setdefault(k, v)
+        if v is not None:
+            env.setdefault(str(k), v)
 
 
 LLM_MODES = {"no", "all", "images-only", "text-only"}
@@ -57,6 +46,17 @@ def parse_positive_int_env(value: str | None, *, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def parse_non_negative_float_env(value: str | None, *, default: float) -> float:
+    """Parse a non-negative float env var; fall back to default when unset/invalid."""
+    if value is None:
+        return default
+    try:
+        parsed = float(value.strip())
+    except ValueError:
+        return default
+    return parsed if parsed >= 0 else default
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     enabled: bool
@@ -66,9 +66,11 @@ class LLMConfig:
     base_url: str
     mode: str = "all"  # no | all | images-only | text-only
     max_concurrency: int = 2
+    min_interval_seconds: float = 2.0
     model_source: str = "default"
     base_url_source: str = "default"
     max_concurrency_source: str = "default"
+    min_interval_source: str = "default"
 
     def redacted(self) -> dict:
         return {
@@ -82,6 +84,8 @@ class LLMConfig:
             "openai_api_key_present": bool(self.api_key),
             "max_concurrency": self.max_concurrency,
             "max_concurrency_source": self.max_concurrency_source,
+            "min_interval_seconds": self.min_interval_seconds,
+            "min_interval_source": self.min_interval_source,
         }
 
 
@@ -155,6 +159,9 @@ def resolve_llm_config(
     max_concurrency_env = env.get("TTRPG_MARKER_LLM_MAX_CONCURRENCY")
     max_concurrency = parse_positive_int_env(max_concurrency_env, default=2)
     max_concurrency_source = "env" if max_concurrency_env else "default"
+    min_interval_env = env.get("TTRPG_MARKER_LLM_MIN_INTERVAL_SECONDS")
+    min_interval_seconds = parse_non_negative_float_env(min_interval_env, default=2.0)
+    min_interval_source = "env" if min_interval_env else "default"
     return LLMConfig(
         enabled=enabled,
         enabled_source=enabled_source,
@@ -163,9 +170,11 @@ def resolve_llm_config(
         base_url=base_url,
         mode=mode,
         max_concurrency=max_concurrency,
+        min_interval_seconds=min_interval_seconds,
         model_source=model_source,
         base_url_source=base_url_source,
         max_concurrency_source=max_concurrency_source,
+        min_interval_source=min_interval_source,
     )
 
 

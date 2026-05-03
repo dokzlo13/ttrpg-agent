@@ -280,6 +280,7 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 | `TTRPG_MARKER_OPENAI_MODEL` | book ingest | Default `gpt-4o-mini` for Marker LLM calls |
 | `TTRPG_MARKER_OPENAI_BASE_URL` | book ingest | OpenAI-compatible base URL; default `https://api.openai.com/v1` |
 | `TTRPG_MARKER_LLM_MAX_CONCURRENCY` | book ingest | Parallel Marker LLM calls; default `2`, lower to `1` for rate limits |
+| `TTRPG_MARKER_LLM_MIN_INTERVAL_SECONDS` | book ingest | Minimum spacing between Marker LLM calls; default `2.0` to reduce TPM bursts |
 | `TTRPG_MARKER_DEVICE` | book ingest | `auto`, `cuda`, `cpu`, `mps` |
 | `TTRPG_MARKER_*_BATCH_SIZE` | book ingest | Optional Marker local OCR/layout batch tuning |
 | `EXA_API_KEY` | web research | Optional direct Exa key for pi-web-access; Exa MCP may work without it |
