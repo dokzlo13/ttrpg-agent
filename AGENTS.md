@@ -201,6 +201,7 @@ Use these to produce table-facing material, not to answer local canonical facts.
 
 | Task trigger | Use |
 |---|---|
+| Several original possibilities for an open-ended design task | Main agent gathers relevant context → `creative-brainstorm` |
 | Read-aloud, boxed text, scene description | `ttrpg-create-readaloud` |
 | Web inspiration, naming, mythology, current rulings beyond local data | `ttrpg-research-web` |
 | Explicit image-generation request | `ttrpg-create-image-gen` |
@@ -234,6 +235,9 @@ confirmation before deletion.
   `ttrpg-foundry-enrichers` for description syntax.
 - **Live Foundry world:** `ttrpg-foundry-mcp` for setup/diagnostics, then use
   `foundry-vtt` MCP tools; prefer read-only smoke tests before controlled writes.
+- **Creative alternatives:** main agent retrieves and verifies relevant context →
+  self-contained brief → `creative-brainstorm` parallel ideation and curation →
+  main agent triages and implements the selected direction.
 - **Save durable prep:** navigation → `ttrpg-vault-authoring` → optional
   rich-note/canvas skill → write under `vault/notes/` → qmd refresh if needed.
 - **Promote old-vault material:** navigation → archive search/read →
@@ -243,10 +247,11 @@ confirmation before deletion.
 
 ## Subagents and prompt shortcuts
 
-Use subagents when context/log volume would balloon:
+Use subagents when context/log volume would balloon or independent creative exploration materially improves the result:
 
 - One non-5e statblock conversion → `statblock-converter`.
 - Broad fact-finding across books/notes/archive/web → `researcher`.
+- Open-ended creative design with several viable directions → `creative-brainstorm` saved chain; its ideator and curator agents are internal stages.
 
 When using `subagent(...)`, omit `output` unless you want a real output file
 path. Do **not** pass `output: false`; this runtime may stringify it.

@@ -1,0 +1,309 @@
+{
+  "name": "creative-brainstorm",
+  "description": "Four isolated creative lenses in parallel, followed by selective curation.",
+  "chain": [
+    {
+      "phase": "Divergence",
+      "label": "Four creative lenses",
+      "parallel": [
+        {
+          "agent": "creative-ideator",
+          "as": "batch_a",
+          "skill": false,
+          "reads": false,
+          "progress": false,
+          "task": "CREATIVE BRIEF\n{task}\n\nASSIGNED LENS — Assumption inversion\nIdentify the most obvious answer and its supporting assumptions. Reverse, remove, redistribute, or reinterpret one important assumption while retaining relevance and causal coherence. Generate 2–3 candidates and return only the required structured output.",
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidates"
+            ],
+            "properties": {
+              "candidates": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "handle",
+                    "core_idea",
+                    "mechanism",
+                    "interaction",
+                    "consequences",
+                    "fit",
+                    "nearest_cliche",
+                    "structural_difference",
+                    "risks"
+                  ],
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "core_idea": {
+                      "type": "string"
+                    },
+                    "mechanism": {
+                      "type": "string"
+                    },
+                    "interaction": {
+                      "type": "string"
+                    },
+                    "consequences": {
+                      "type": "string"
+                    },
+                    "fit": {
+                      "type": "string"
+                    },
+                    "nearest_cliche": {
+                      "type": "string"
+                    },
+                    "structural_difference": {
+                      "type": "string"
+                    },
+                    "risks": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "acceptance": false
+        },
+        {
+          "agent": "creative-ideator",
+          "as": "batch_b",
+          "skill": false,
+          "reads": false,
+          "progress": false,
+          "task": "CREATIVE BRIEF\n{task}\n\nASSIGNED LENS — Remote mechanism\nImport a functional mechanism from an unrelated field such as ecology, contract law, logistics, economics, anthropology, epidemiology, linguistics, organizational politics, distributed systems, or game theory. The mechanism must causally generate the idea, not merely decorate it with terminology. Generate 2–3 candidates and return only the required structured output.",
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidates"
+            ],
+            "properties": {
+              "candidates": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "handle",
+                    "core_idea",
+                    "mechanism",
+                    "interaction",
+                    "consequences",
+                    "fit",
+                    "nearest_cliche",
+                    "structural_difference",
+                    "risks"
+                  ],
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "core_idea": {
+                      "type": "string"
+                    },
+                    "mechanism": {
+                      "type": "string"
+                    },
+                    "interaction": {
+                      "type": "string"
+                    },
+                    "consequences": {
+                      "type": "string"
+                    },
+                    "fit": {
+                      "type": "string"
+                    },
+                    "nearest_cliche": {
+                      "type": "string"
+                    },
+                    "structural_difference": {
+                      "type": "string"
+                    },
+                    "risks": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "acceptance": false
+        },
+        {
+          "agent": "creative-ideator",
+          "as": "batch_c",
+          "skill": false,
+          "reads": false,
+          "progress": false,
+          "task": "CREATIVE BRIEF\n{task}\n\nASSIGNED LENS — Consequence first\nBegin with an interesting participant-facing consequence: an obligation, dependency, dilemma, transfer of control, irreversible permission, changed relationship, unexpected beneficiary, or new constraint created by success. Work backward to a plausible cause. Generate 2–3 candidates and return only the required structured output.",
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidates"
+            ],
+            "properties": {
+              "candidates": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "handle",
+                    "core_idea",
+                    "mechanism",
+                    "interaction",
+                    "consequences",
+                    "fit",
+                    "nearest_cliche",
+                    "structural_difference",
+                    "risks"
+                  ],
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "core_idea": {
+                      "type": "string"
+                    },
+                    "mechanism": {
+                      "type": "string"
+                    },
+                    "interaction": {
+                      "type": "string"
+                    },
+                    "consequences": {
+                      "type": "string"
+                    },
+                    "fit": {
+                      "type": "string"
+                    },
+                    "nearest_cliche": {
+                      "type": "string"
+                    },
+                    "structural_difference": {
+                      "type": "string"
+                    },
+                    "risks": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "acceptance": false
+        },
+        {
+          "agent": "creative-ideator",
+          "as": "batch_d",
+          "skill": false,
+          "reads": false,
+          "progress": false,
+          "task": "CREATIVE BRIEF\n{task}\n\nASSIGNED LENS — Actor and system collision\nConstruct each idea from actors or forces with understandable but incompatible incentives. Include second-order consequences and what changes when participants interfere. Generate 2–3 candidates and return only the required structured output.",
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidates"
+            ],
+            "properties": {
+              "candidates": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "handle",
+                    "core_idea",
+                    "mechanism",
+                    "interaction",
+                    "consequences",
+                    "fit",
+                    "nearest_cliche",
+                    "structural_difference",
+                    "risks"
+                  ],
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "core_idea": {
+                      "type": "string"
+                    },
+                    "mechanism": {
+                      "type": "string"
+                    },
+                    "interaction": {
+                      "type": "string"
+                    },
+                    "consequences": {
+                      "type": "string"
+                    },
+                    "fit": {
+                      "type": "string"
+                    },
+                    "nearest_cliche": {
+                      "type": "string"
+                    },
+                    "structural_difference": {
+                      "type": "string"
+                    },
+                    "risks": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "acceptance": false
+        }
+      ],
+      "concurrency": 4,
+      "failFast": false,
+      "worktree": false
+    },
+    {
+      "agent": "creative-curator",
+      "phase": "Curation",
+      "label": "Diverse shortlist",
+      "skill": false,
+      "reads": false,
+      "progress": false,
+      "task": "CREATIVE BRIEF\n{task}\n\nANONYMIZED CANDIDATE BATCH A\n{outputs.batch_a}\n\nANONYMIZED CANDIDATE BATCH B\n{outputs.batch_b}\n\nANONYMIZED CANDIDATE BATCH C\n{outputs.batch_c}\n\nANONYMIZED CANDIDATE BATCH D\n{outputs.batch_d}\n\nCurate the strongest requested number of viable, structurally diverse ideas. Return only the required JSON object.",
+      "acceptance": false
+    }
+  ]
+}

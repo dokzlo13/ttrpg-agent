@@ -26,7 +26,7 @@ This repository tracks the machinery: pi skills, slash prompts, subagents, exten
 - Produce **Foundry 5e Statblock Importer** paste text and separate Foundry dnd5e enricher prose.
 - Connect to a running **Foundry VTT** world through MCP for live world inspection and controlled document operations.
 - Generate OpenAI image assets on explicit request, with adjacent Markdown asset notes for indexing.
-- Delegate slow/noisy work to focused subagents for research and monster conversion.
+- Delegate slow/noisy work to focused subagents for research and monster conversion, and run isolated parallel ideation plus curation for open-ended creative design.
 
 ## What it is not
 
@@ -51,6 +51,7 @@ ttrpg-agent/
 │   ├── skills/                # task-specific operating procedures
 │   ├── prompts/               # slash prompts, e.g. /find-monster
 │   ├── agents/                # focused subagent definitions
+│   ├── chains/                # saved multi-agent workflows
 │   ├── extensions/            # project-local pi extensions, incl. query_5etools and vault_frontmatter
 │   ├── scripts/               # launch/qmd environment wrappers
 │   └── cli/                   # helper CLIs and external-service launchers
@@ -242,9 +243,10 @@ absence of content.
 /npc a suspicious river toll collector
 /readaloud the party finds a candlelit pit in the forest
 /illustrate original token portrait for a moss-covered undead charcoal burner
+/run-chain creative-brainstorm -- Create five structurally distinct complications for this alliance; context: ...
 ```
 
-Image generation is metered and should only happen on explicit request.
+The creative-brainstorm chain only generates and curates possibilities. Include all relevant context and constraints in its brief; the main agent handles retrieval, validation, and implementation. Image generation is metered and should only happen on explicit request.
 
 ---
 
@@ -378,6 +380,7 @@ Skills are procedural reference files the agent loads when a task matches. Curre
   - `ttrpg-foundry-dnd5e-wiki` — targeted research against Foundry dnd5e implementation docs.
   - `ttrpg-foundry-mcp` — configure, bootstrap, smoke-test, reconnect, and troubleshoot live Foundry MCP access.
 - **Creative prep**
+  - `creative-brainstorm` — four isolated creative lenses followed by curation for open-ended design tasks; the main agent supplies a self-contained brief.
   - `ttrpg-create-readaloud` — boxed text/read-aloud style.
   - `ttrpg-create-image-gen` — explicit image-generation workflow and asset-note contract.
 - **Maintenance**
@@ -406,10 +409,11 @@ Prompt templates live in `.pi/prompts/` and are invoked inside pi with `/name`:
 
 ## Subagents
 
-Subagents live in `.pi/agents/` and are used when a task would otherwise flood the main session with logs/context.
+Subagents live in `.pi/agents/`; reusable multi-agent workflows live in `.pi/chains/`.
 
 - `researcher` — read-only broad search across books, notes, archive, 5etools snippets, and web.
 - `statblock-converter` — one-monster conversion agent that saves monster notes under `vault/notes/mechanics/monsters/` and emits Foundry importer text.
+- `creative-brainstorm` chain — runs four isolated ideators concurrently through different creative lenses, then passes their structured candidates to an isolated curator. `creative-ideator` and `creative-curator` are internal stages rather than standalone workflows.
 
 ---
 
