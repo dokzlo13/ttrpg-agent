@@ -59,7 +59,7 @@ When the user has not chosen a precise scope, offer these options:
 
 | Scope | Deletes | Preserves / notes |
 |---|---|---|
-| `search-index` | `.qmd/qmd/` contents | Keeps qmd container structure. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. Preserves `.cache/` model caches. |
+| `search-index` | `.qmd/index.sqlite*` | Keeps qmd configuration and model symlinks. Rebuild with `qmd update`; run `qmd embed` only if semantic search is needed. |
 | `all-index-caches` | Contents of `.qmd/` | Keeps `.qmd/` directory. This removes rebuildable qmd config/index state only. It **must preserve `.cache/`** so qmd/Marker/HuggingFace/torch/uv models are not re-downloaded. Does **not** touch `.pi/cli/`. |
 | `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. |
 | `ingested-books` | Generated book folders under `vault/library/books/`, either all or selected slugs | Keeps `vault/library/books/` directory. Does not delete source PDFs in `imports/books/`. |
@@ -148,11 +148,8 @@ set -euo pipefail
 cd /path/to/ttrpg-agent
 stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-search-index.txt"
-find .qmd/qmd -mindepth 1 -print 2>/dev/null | sort > "$manifest" || true
-if [ -d .qmd/qmd ]; then
-  find .qmd/qmd -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-fi
-mkdir -p .qmd/qmd .cache/datalab/models .cache/qmd/models .cache/uv .cache/huggingface .cache/torch
+find .qmd -maxdepth 1 -type f -name 'index.sqlite*' -print | sort > "$manifest"
+rm -f .qmd/index.sqlite .qmd/index.sqlite-shm .qmd/index.sqlite-wal
 printf 'Manifest: %s\n' "$manifest"
 ```
 

@@ -75,18 +75,15 @@ Use only when normal `qmd update` leaves stale/deleted docs, collection paths ar
 or after major folder migrations:
 
 ```bash
-rm -rf .qmd/qmd
+rm -f .qmd/index.sqlite .qmd/index.sqlite-shm .qmd/index.sqlite-wal
 source ./.pi/scripts/pi-shell.sh
 qmd update
 qmd embed
 qmd status
 ```
 
-Notes:
-
-- This preserves project-local `.cache/` model/cache data.
-- It should not re-download/rebuild qmd or Marker models unless `.cache/` was manually removed outside normal maintenance.
-- If semantic search is not needed immediately, skip `qmd embed` and mention that vectors are stale/missing.
+This preserves `.qmd/index.yml` configuration and `.cache/` models. Skip
+`qmd embed` when semantic search is not needed immediately.
 
 ## Index cleanup for broader data cleanup
 
@@ -96,8 +93,7 @@ protected paths. This skill is for qmd health and rebuilds, not broad deletion.
 
 For qmd specifically:
 
-- **Search-index cleanup** deletes only `.qmd/qmd/`.
-  This is the preferred destructive qmd reset and preserves `.cache/` uv/datalab/qmd model caches.
+- **Search-index cleanup** deletes only `.qmd/index.sqlite*` and preserves configuration and `.cache/` models.
 - **All-index-caches cleanup** deletes the contents of `.qmd/`.
   This removes rebuildable qmd config/index state but still preserves `.cache/`; it should not force model re-downloads. It still must not touch `.pi/cli/`, `.pi/scripts/`, or `.cache/`.
 - After deleting vault notes, ingested books, or archive imports, run `qmd update` so deleted docs

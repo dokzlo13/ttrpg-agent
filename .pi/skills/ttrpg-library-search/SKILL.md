@@ -85,6 +85,24 @@ qmd supports three search modes. Pick the cheapest one that answers the question
 After a hit, **always `qmd get <doc-id>`** to pull the full surrounding chunk
 before quoting or summarizing. The list output gives titles, not bodies.
 
+## Known-path scoping
+
+Qmd filters by collection, not subpath. To search within a known book or notes
+folder, query its collection and retain only the matching qmd URI prefix:
+
+```bash
+collection="books"; path="the-pit-in-the-forest-v1-2-basic-bx"
+qmd search "charcoal burners" -c "$collection" --all --json \
+  | jq --arg p "qmd://$collection/$path/" '[.[]|select(.file|startswith($p))]'
+```
+
+Verify paths with `qmd ls <collection>/<path>`. Use the same guard for hybrid
+queries, raising candidate/result limits because filtering happens after
+retrieval. Book slugs are indexed in generated frontmatter and may improve
+lexical recall; note filenames and folder names are not exact search filters.
+Always `qmd get` retained hits. For absence claims, read the scoped files—search
+alone is not proof of absence. Do not create overlapping collections for paths.
+
 ## Concrete invocations
 
 ```bash

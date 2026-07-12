@@ -28,12 +28,8 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
 fi
 
 export QMD_CONFIG_DIR="$PROJECT_ROOT/.qmd"
-# qmd stores its SQLite index under XDG_CACHE_HOME/qmd, so keep XDG_CACHE_HOME
-# at .qmd for project-local rebuildable index state. Heavyweight reusable
-# models/caches are real directories under .cache and are exposed to tools via
-# env vars and symlinks (.qmd/datalab -> .cache/datalab,
-# .qmd/qmd/models -> .cache/qmd/models). Thus .qmd wipeouts remove only
-# rebuildable state/symlinks, not the model payloads.
+# Keep qmd's config/index project-local. Heavy model caches live under .cache
+# and are exposed through symlinks, so index rebuilds do not redownload models.
 export TTRPG_CACHE_DIR="${TTRPG_CACHE_DIR:-$PROJECT_ROOT/.cache}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$QMD_CONFIG_DIR}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$TTRPG_CACHE_DIR/uv}"
@@ -50,9 +46,11 @@ if [ -x /usr/local/cuda/bin/nvcc ]; then
     *) export PATH="/usr/local/cuda/bin:$PATH" ;;
   esac
 fi
-# qmd/node-llama-cpp treats QMD_LLAMA_GPU as an on/off switch, not a backend selector:
-# false/off/none/0 force CPU; any other value lets node-llama-cpp auto-pick CUDA/Vulkan/CPU.
-export QMD_LLAMA_GPU="${QMD_LLAMA_GPU:-auto}"
+# qmd 2.5+: leave QMD_LLAMA_GPU unset for automatic selection; explicit values are
+# metal, vulkan, cuda, or false/off/0. Older configs may still contain "auto".
+if [ "${QMD_LLAMA_GPU:-}" = "auto" ]; then
+  unset QMD_LLAMA_GPU
+fi
 # Work around llama.cpp CUDA VMM pool failures on WSL2/RTX 50xx
 # (cuMemAddressReserve(CUDA_POOL_VMM_MAX_SIZE) can abort despite enough VRAM).
 export GGML_CUDA_NO_VMM="${GGML_CUDA_NO_VMM:-1}"
@@ -142,13 +140,14 @@ _pi_qmd_ensure_config() {
 }
 
 _pi_qmd_ensure_index_if_missing() {
-  if [ ! -f "$QMD_CONFIG_DIR/qmd/index.sqlite" ]; then
+  if [ ! -f "$QMD_CONFIG_DIR/index.sqlite" ]; then
     command qmd update >&2
   fi
 }
 
 _pi_qmd_cpu_forced() {
-  case "${QMD_LLAMA_GPU,,}" in
+  local gpu="${QMD_LLAMA_GPU:-}"
+  case "${gpu,,}" in
     false|off|none|disable|disabled|0) return 0 ;;
     *) return 1 ;;
   esac
