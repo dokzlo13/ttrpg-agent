@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "foundry-vtt": {
+      "command": "bash",
+      "args": [".pi/cli/foundry-mcp/run.sh"],
+      "lifecycle": "lazy",
+      "idleTimeout": 10,
+      "requestTimeoutMs": 60000,
+      "debug": false
+    }
+  }
+}

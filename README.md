@@ -24,12 +24,13 @@ This repository tracks the machinery: pi skills, slash prompts, subagents, exten
 - Write durable Obsidian notes, stubs, canvases, read-alouds, NPCs, mechanics notes, and connections under `vault/notes/`.
 - Convert OSR/BX/OSE/AD&D-style monsters and traps into D&D 5e/2024 equivalents.
 - Produce **Foundry 5e Statblock Importer** paste text and separate Foundry dnd5e enricher prose.
+- Connect to a running **Foundry VTT** world through MCP for live world inspection and controlled document operations.
 - Generate OpenAI image assets on explicit request, with adjacent Markdown asset notes for indexing.
 - Delegate slow/noisy work to focused subagents for research and monster conversion.
 
 ## What it is not
 
-- Not a live Foundry module or API integration. Foundry output is copy/paste oriented.
+- Not a Foundry module: live access uses a dedicated Foundry user and an external stdio MCP server; copy/paste importer workflows remain available.
 - Not a substitute for DM judgment on encounter balance.
 - Not a copyright-clean public dataset. Your local books/PDFs are for your personal prep.
 - Not a zero-code app. It assumes you are comfortable letting pi run shell commands in this repo.
@@ -52,7 +53,7 @@ ttrpg-agent/
 │   ├── agents/                # focused subagent definitions
 │   ├── extensions/            # project-local pi extensions, incl. query_5etools and vault_frontmatter
 │   ├── scripts/               # launch/qmd environment wrappers
-│   └── cli/                   # uv-managed helper CLIs
+│   └── cli/                   # helper CLIs and external-service launchers
 ├── .qmd/                      # ignored qmd config/index state (rebuildable)
 ├── .cache/                    # ignored project-local persistent model/cache state
 ├── imports/                   # ignored raw inputs/reference mirrors
@@ -83,7 +84,8 @@ ttrpg-agent/
 | ripgrep / `rg` | fast repo/vault search used by agents | `sudo apt install ripgrep`, `brew install ripgrep`, or winget; docs: <https://ripgrep.dev> |
 | fd | fast file discovery used by humans/agents | `sudo apt install fd-find` on Ubuntu (binary is often `fdfind`), `brew install fd`, or winget; upstream: <https://github.com/sharkdp/fd> |
 | jq | inspect JSON ingest reports and qmd/tool output | `sudo apt install jq`, `brew install jq`, or winget |
-| Bash + coreutils | shell wrappers in `.pi/scripts/` | Linux/macOS/WSL first-class; native Windows is not the primary target |
+| Bash + coreutils | shell wrappers in `.pi/scripts/` and `.pi/cli/` | Linux/macOS/WSL first-class; native Windows is not the primary target |
+| iproute2 (`ip`) | automatic Windows-host discovery for Foundry MCP under WSL | Normally preinstalled on Ubuntu; otherwise `sudo apt install iproute2` |
 
 ### Required accounts/keys for the intended stack
 
@@ -94,7 +96,7 @@ ttrpg-agent/
 
 - **NVIDIA CUDA** for faster qmd/model and Marker workloads. The shell wrapper detects `/usr/local/cuda/bin/nvcc` and sets CUDA-related env vars. CPU fallback is supported.
 - **Obsidian** for browsing/editing `vault/` as a graph.
-- **Foundry VTT + dnd5e system + 5e Statblock Importer module** for consuming generated monster/importer text.
+- **Foundry VTT + dnd5e system** for live MCP access; the **5e Statblock Importer module** remains optional for paste-based monster imports. Live MCP uses the external `TheStranjer/foundry-vtt-mcp` server and does not require a Foundry-side MCP module.
 - **Exa / Perplexity / Gemini API keys** or a supported browser login for the `pi-web-access` web research extension. Exa MCP may work with no key.
 
 ---
@@ -292,6 +294,9 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 | `EXA_API_KEY` | web research | Optional direct Exa key for pi-web-access; Exa MCP may work without it |
 | `PERPLEXITY_API_KEY` | web research | Optional Perplexity fallback for pi-web-access |
 | `GEMINI_API_KEY` | web/video research | Optional Gemini API fallback for pi-web-access |
+| `FOUNDRY_MCP_USER` / `FOUNDRY_MCP_PASSWORD` | live Foundry MCP | Existing dedicated user in the active world; keep the password only in `.env` |
+| `FOUNDRY_MCP_HOST` / `FOUNDRY_MCP_PORT` | live Foundry MCP | `HOST=auto` discovers the Windows host under WSL; otherwise use a direct hostname/IP and numeric port |
+| `FOUNDRY_MCP_ALLOW_SELF_SIGNED` | live Foundry MCP | Set `true` only for a known self-signed Foundry HTTPS endpoint |
 
 ### `.pi/scripts/`
 
@@ -371,6 +376,7 @@ Skills are procedural reference files the agent loads when a task matches. Curre
   - `ttrpg-foundry-statblock-importer` — plain WotC-style statblock importer formatting.
   - `ttrpg-foundry-enrichers` — Foundry dnd5e text enrichers for journals/items/actor descriptions.
   - `ttrpg-foundry-dnd5e-wiki` — targeted research against Foundry dnd5e implementation docs.
+  - `ttrpg-foundry-mcp` — configure, bootstrap, smoke-test, reconnect, and troubleshoot live Foundry MCP access.
 - **Creative prep**
   - `ttrpg-create-readaloud` — boxed text/read-aloud style.
   - `ttrpg-create-image-gen` — explicit image-generation workflow and asset-note contract.
@@ -487,12 +493,13 @@ It never decides meaning or destination. The LLM chooses placement, then edits t
 
 ## Foundry VTT workflow
 
-The project treats Foundry output as two separate things:
+The project supports three separate Foundry workflows:
 
-1. **Importer statblock** — plain WotC-style prose for the 5e Statblock Importer. No Foundry enrichers inside the import block.
-2. **Post-import prose** — Foundry dnd5e enrichers for actor/item/journal descriptions, clickable saves/checks/damage, references, and notes.
+1. **Live MCP world access** — `.pi/mcp.json` launches `.pi/cli/foundry-mcp/run.sh`, which connects as a dedicated Foundry user. See [`.pi/cli/foundry-mcp/README.md`](.pi/cli/foundry-mcp/README.md). Run `.pi/cli/foundry-mcp/smoke-test.sh` for an end-to-end read-only validation.
+2. **Importer statblock** — plain WotC-style prose for the 5e Statblock Importer. No Foundry enrichers inside the import block.
+3. **Post-import prose** — Foundry dnd5e enrichers for actor/item/journal descriptions, clickable saves/checks/damage, references, and notes.
 
-This separation avoids broken imports while still giving you richer Foundry text after the actor/item exists.
+Keep these concerns separate: MCP performs live world operations, importer text creates actors through the optional module, and enrichers format post-import descriptions.
 
 ---
 

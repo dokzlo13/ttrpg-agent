@@ -190,6 +190,7 @@ Keep importer format, clickable prose, and system implementation separate.
 | Foundry 5e-statblock-importer paste text | `ttrpg-foundry-statblock-importer` |
 | Foundry actor/item/journal prose with clickable rolls, saves, checks, references | `ttrpg-foundry-enrichers` |
 | Foundry dnd5e system implementation: activities, effects, advancements, hooks, formulas | `ttrpg-foundry-dnd5e-wiki` |
+| Configure, reconnect, smoke-test, or troubleshoot live Foundry MCP access | `ttrpg-foundry-mcp`; routine live-world operations use the `foundry-vtt` MCP tools directly |
 
 Importer rule: main statblock importer text must be plain WotC-style prose.
 Foundry enrichers belong only in a separate post-import section.
@@ -231,6 +232,8 @@ confirmation before deletion.
   authoring if saved.
 - **Foundry item/actor setup:** `ttrpg-foundry-dnd5e-wiki` for system behavior,
   `ttrpg-foundry-enrichers` for description syntax.
+- **Live Foundry world:** `ttrpg-foundry-mcp` for setup/diagnostics, then use
+  `foundry-vtt` MCP tools; prefer read-only smoke tests before controlled writes.
 - **Save durable prep:** navigation → `ttrpg-vault-authoring` → optional
   rich-note/canvas skill → write under `vault/notes/` → qmd refresh if needed.
 - **Promote old-vault material:** navigation → archive search/read →
