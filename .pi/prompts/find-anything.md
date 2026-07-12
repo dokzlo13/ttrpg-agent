@@ -2,7 +2,7 @@
 name: find-anything
 description: General-purpose search across books, notes, and optional archive using qmd hybrid mode.
 thinking: low
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.6-terra
 skill: ttrpg-library-search
 ---
 

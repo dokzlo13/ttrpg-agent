@@ -269,8 +269,8 @@ async def _tag_one(
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": evidence},
                     ],
-                    temperature=0,
-                    max_tokens=180,
+                    reasoning_effort="none",
+                    max_completion_tokens=180,
                     response_format={"type": "json_object"},
                 )
             except OpenAIError as exc:
@@ -540,7 +540,7 @@ def cmd_tag(slug: str, force: bool, full_text_chars: int | None, json_output: bo
     chapters = _chapter_paths(book_dir)
     if not chapters:
         raise click.ClickException(f"no chapter markdown files under {book_dir}")
-    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-4o-mini"
+    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-5.6-luna"
     base_url = env.get("TTRPG_MARKER_OPENAI_BASE_URL") or "https://api.openai.com/v1"
     max_concurrency = parse_positive_int_env(env.get("TTRPG_TAG_MAX_CONCURRENCY"), default=4)
     full_chapter_chars = full_text_chars or parse_positive_int_env(

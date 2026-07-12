@@ -243,7 +243,7 @@ def cmd_classify_system(slug: str, force: bool, json_output: bool) -> None:
     if not evidence:
         raise click.ClickException(f"no chapter evidence under {book_dir}")
 
-    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-4o-mini"
+    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-5.6-luna"
     base_url = env.get("TTRPG_MARKER_OPENAI_BASE_URL") or "https://api.openai.com/v1"
     client = OpenAI(api_key=api_key, base_url=base_url)
     started = time.monotonic()
@@ -254,8 +254,8 @@ def cmd_classify_system(slug: str, force: bool, json_output: bool) -> None:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": evidence},
             ],
-            temperature=0,
-            max_tokens=220,
+            reasoning_effort="none",
+            max_completion_tokens=220,
             response_format={"type": "json_object"},
         )
     except OpenAIError as exc:

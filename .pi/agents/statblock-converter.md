@@ -5,7 +5,7 @@ description: |
   appropriate CR scaling, save it to vault/notes/mechanics/monsters/, and include
   importer-ready output plus optional post-import Foundry notes.
 tools: read, grep, write
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 skills: ttrpg-rules-osr-to-5e, ttrpg-foundry-statblock-importer, ttrpg-foundry-enrichers, ttrpg-rules-5etools-query, ttrpg-vault-authoring
 ---

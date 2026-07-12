@@ -5,7 +5,7 @@ description: |
   notes, archive/imports/source-vault, web — and return a focused summary, without polluting
   the main context with intermediate searches. No write access.
 tools: read, grep, find, ls, bash, vault_frontmatter, web_search, fetch_content, get_search_content
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.6-terra
 thinking: medium
 ---
 

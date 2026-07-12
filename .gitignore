@@ -26,6 +26,8 @@ imports/
 .pi/npm/
 .pi/git/
 .pi-home/
+# Runtime transcripts and artifacts emitted by the pi-subagents harness.
+.pi-subagents/
 
 # --- per-tool environments/build output ------------------------------------
 

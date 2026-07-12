@@ -264,14 +264,14 @@ def test_summarize_report_keeps_short_history(tmp_path):
     book_dir = _write_book(tmp_path)
     _update_report(
         book_dir,
-        model="gpt-4o-mini",
+        model="gpt-5.6-luna",
         base_url="https://api.openai.com/v1",
         results=[{"chapter": "01.md", "status": "ok"}],
         duration=1.0,
     )
     _update_report(
         book_dir,
-        model="gpt-4o-mini",
+        model="gpt-5.6-luna",
         base_url="https://api.openai.com/v1",
         results=[{"chapter": "01.md", "status": "skipped"}],
         duration=0.1,

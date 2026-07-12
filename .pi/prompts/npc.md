@@ -1,14 +1,14 @@
 ---
 name: npc
-description: Generate a quick NPC sketch — name, look, voice, hook. Cheaper model, low thinking.
+description: Generate a quick NPC sketch — name, look, voice, hook. Balanced model, low thinking.
 thinking: low
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.6-terra
 skill: ttrpg-vault-authoring
 ---
 
 # /npc
 
-The user wants a quick NPC. This is a low-cost, fast prompt — don't overthink.
+The user wants a quick NPC. This is a fast, lightweight prompt — don't overthink.
 
 1. **Get the brief.** If the user said "an innkeeper", that's enough. If they
    said nothing, ask one question: role + setting? (e.g. "innkeeper, in a

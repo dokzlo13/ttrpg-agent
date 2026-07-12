@@ -227,7 +227,7 @@ def cli(ctx: click.Context) -> None:
     help="Marker LLM mode. CLI > TTRPG_MARKER_LLM_MODE > no.",
 )
 @click.option(
-    "--openai-model", default=None, help="Override TTRPG_MARKER_OPENAI_MODEL / default gpt-4o-mini."
+    "--openai-model", default=None, help="Override TTRPG_MARKER_OPENAI_MODEL / default gpt-5.6-luna."
 )
 @click.option("--openai-base-url", default=None, help="Override TTRPG_MARKER_OPENAI_BASE_URL.")
 @click.option("--page-range", default=None, help="Marker page_range, e.g. '0,5-10,20'.")

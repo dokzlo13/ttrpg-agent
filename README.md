@@ -253,8 +253,13 @@ Image generation is metered and should only happen on explicit request.
 Current project defaults:
 
 - `defaultProvider`: `openai-codex`
-- `defaultModel`: `gpt-5.5`
-- `defaultThinkingLevel`: `medium`
+- `defaultModel`: `gpt-5.6-sol`
+- `defaultThinkingLevel`: `high`
+- Model routing:
+  - `gpt-5.6-sol` for the project default, complex conversions, and quality-first creative work.
+  - `gpt-5.6-terra` for research, retrieval, cleanup planning, and lightweight generation.
+  - `gpt-5.6-luna` for repeatable, high-volume book-ingest LLM calls.
+  - Prompt and agent overrides preserve their prior thinking levels unless the workload requires more.
 - Project pi packages:
   - `pi-web-access` for web search/fetch tools.
   - `pi-subagents` for delegation workflows.
@@ -278,7 +283,7 @@ Copy `.env.example` to `.env`. `.env` is ignored. Important keys:
 | `TTRPG_IMAGE_OUTPUT_FORMAT` | image generation | `png`, `jpeg`, or `webp`; default `png` |
 | `TTRPG_IMAGE_OUTPUT_DIR` | image generation | Must stay under `vault/notes/images` |
 | `TTRPG_MARKER_LLM_MODE` | book ingest | `no`, `images-only`, `text-only`, `all` |
-| `TTRPG_MARKER_OPENAI_MODEL` | book ingest | Default `gpt-4o-mini` for Marker LLM calls |
+| `TTRPG_MARKER_OPENAI_MODEL` | book ingest | Default `gpt-5.6-luna` for Marker LLM calls |
 | `TTRPG_MARKER_OPENAI_BASE_URL` | book ingest | OpenAI-compatible base URL; default `https://api.openai.com/v1` |
 | `TTRPG_MARKER_LLM_MAX_CONCURRENCY` | book ingest | Parallel Marker LLM calls; default `2`, lower to `1` for rate limits |
 | `TTRPG_MARKER_LLM_MIN_INTERVAL_SECONDS` | book ingest | Minimum spacing between Marker LLM calls; default `2.0` to reduce TPM bursts |

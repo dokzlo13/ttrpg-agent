@@ -2,7 +2,7 @@
 name: readaloud
 description: Write a "read aloud" boxed-text passage for the table.
 thinking: medium
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 skill: ttrpg-create-readaloud
 ---
 

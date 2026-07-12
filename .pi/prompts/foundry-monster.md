@@ -2,7 +2,7 @@
 name: foundry-monster
 description: Format an existing monster or conversion as importer-ready text plus optional post-import Foundry enrichers.
 thinking: medium
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 skill: ttrpg-foundry-statblock-importer
 ---
 

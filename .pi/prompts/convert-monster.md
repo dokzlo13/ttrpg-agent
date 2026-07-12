@@ -2,7 +2,7 @@
 name: convert-monster
 description: Convert an OSR or non-5e monster into a 5e 2014/2024 statblock, ready for Foundry importer paste.
 thinking: high
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 skill: ttrpg-rules-osr-to-5e
 ---
 

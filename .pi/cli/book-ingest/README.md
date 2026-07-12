@@ -76,7 +76,7 @@ book-ingest validate <book-dir> [--json] [--write/--no-write]
 | `--dry-run` | off | Show what would be written; no Marker call. |
 | `--keep-backup / --no-keep-backup` | `--no-keep-backup` | Retain dot-prefixed replacement backups. |
 | `--llm {no\|images-only\|text-only\|all}` | resolved | CLI > `TTRPG_MARKER_LLM_MODE` > `no`. |
-| `--openai-model TEXT` | `gpt-4o-mini` | Used only when LLM mode is not `no`. |
+| `--openai-model TEXT` | `gpt-5.6-luna` | Used only when LLM mode is not `no`. |
 | `--openai-base-url TEXT` | `https://api.openai.com/v1` | OpenAI-compatible endpoint. |
 | `--page-range TEXT` | none | Marker `page_range`, e.g. `0,5-10,20`. |
 | `--force-ocr` | off | Marker `force_ocr`. |
@@ -227,7 +227,7 @@ Every ingest prints one structural status line to stderr before Marker starts,
 including resolved sources for important runtime settings, for example:
 
 ```text
-book-ingest: llm.mode=images-only[cli] llm.model=gpt-4o-mini[env] llm.concurrency=1[env] device=cuda[env] torch.cuda=true torch.gpu="NVIDIA GeForce RTX 5090" page_range=0-1[cli]
+book-ingest: llm.mode=images-only[cli] llm.model=gpt-5.6-luna[env] llm.concurrency=1[env] device=cuda[env] torch.cuda=true torch.gpu="NVIDIA GeForce RTX 5090" page_range=0-1[cli]
 book-ingest: llm.mode=no[default] device=cuda[env] torch.cuda=true torch.gpu="NVIDIA GeForce RTX 5090"
 ```
 
@@ -257,7 +257,8 @@ follow-ons require `OPENAI_API_KEY`; missing key prints a skip message and exits
 Env vars for follow-ons:
 
 - `OPENAI_API_KEY` — required for metered commands; absent → skip+exit 0.
-- `TTRPG_MARKER_OPENAI_MODEL` — default `gpt-4o-mini`.
+- `TTRPG_MARKER_OPENAI_MODEL` — default `gpt-5.6-luna` for repeatable, high-volume ingest work.
+  Direct summarize/classify/tag calls use no reasoning effort and bounded completion budgets.
 - `TTRPG_MARKER_OPENAI_BASE_URL` — default `https://api.openai.com/v1`.
 - `TTRPG_SUMMARIZE_MAX_CONCURRENCY` — default `4`.
 - `TTRPG_TAG_FULL_CHAPTER_CHARS` — default `18000`. Shared by

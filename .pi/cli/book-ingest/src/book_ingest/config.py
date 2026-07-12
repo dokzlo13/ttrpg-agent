@@ -143,7 +143,7 @@ def resolve_llm_config(
         model = env["TTRPG_MARKER_OPENAI_MODEL"]
         model_source = "env"
     else:
-        model = "gpt-4o-mini"
+        model = "gpt-5.6-luna"
         model_source = "default"
 
     if cli_base_url:

@@ -2,7 +2,7 @@
 name: illustrate
 description: Generate one TTRPG visual asset with OpenAI image generation.
 thinking: medium
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 skill: ttrpg-create-image-gen
 ---
 

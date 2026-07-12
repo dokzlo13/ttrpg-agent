@@ -2,7 +2,7 @@
 name: find-monster
 description: Find a monster across canonical 5e data and ingested books. Tries query_5etools first, falls back to qmd.
 thinking: low
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.6-terra
 skill: ttrpg-rules-5etools-query
 ---
 

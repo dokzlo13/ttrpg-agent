@@ -77,8 +77,8 @@ async def _summarize_one(
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": body[:MAX_INPUT_CHARS]},
                 ],
-                temperature=0.2,
-                max_tokens=200,
+                reasoning_effort="none",
+                max_completion_tokens=200,
             )
         except OpenAIError as exc:
             return {
@@ -207,7 +207,7 @@ def cmd_summarize(
         click.echo(message, err=True)
         return
 
-    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-4o-mini"
+    model = env.get("TTRPG_MARKER_OPENAI_MODEL") or "gpt-5.6-luna"
     base_url = env.get("TTRPG_MARKER_OPENAI_BASE_URL") or "https://api.openai.com/v1"
     max_concurrency = parse_positive_int_env(env.get("TTRPG_SUMMARIZE_MAX_CONCURRENCY"), default=4)
     resolved_long_threshold = long_threshold or parse_positive_int_env(

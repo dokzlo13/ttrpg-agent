@@ -3,7 +3,7 @@ name: cleanup
 description: Destructive cleanup/reset for vault, imports, ingested books, and qmd indexes.
 argument-hint: "[scope or paths]"
 thinking: medium
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.6-terra
 skill: ttrpg-system-data-cleanup
 ---
 
