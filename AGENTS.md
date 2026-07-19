@@ -82,7 +82,7 @@ Skills are progressive reference material. If a task matches a skill, read that
 `SKILL.md` before acting. Prefer the most specific matching skill, but keep this
 order in mind:
 
-> navigation/source → rules/search/import → conversion/format → vault placement → rich output/canvas → index/cleanup
+> navigation/source → rules/search/import → conversion/format → campaign design → vault placement → rich output/canvas → index/cleanup
 
 ### 0. Workspace navigation and source boundaries
 
@@ -195,17 +195,25 @@ Keep importer format, clickable prose, and system implementation separate.
 Importer rule: main statblock importer text must be plain WotC-style prose.
 Foundry enrichers belong only in a separate post-import section.
 
-### 6. Creative prep and outside inspiration
+### 6. Campaign design, creative prep, and outside inspiration
 
-Use these to produce table-facing material, not to answer local canonical facts.
+Use these to design campaign material and produce table-facing output, not to
+answer local canonical facts.
 
 | Task trigger | Use |
 |---|---|
+| Develop, expand, connect, or audit multi-session arcs, storylines, quest networks, mysteries, faction conflicts, or module integration against established campaign truth | `ttrpg-vault-navigation` → `ttrpg-campaign-design` |
+| "Plot the next arc" / turn loose ideas or a requested plot into cohesive, non-mandatory world situations | `ttrpg-vault-navigation` → `ttrpg-campaign-design` |
 | Several original possibilities for an open-ended design task | Main agent gathers relevant context → `creative-brainstorm` |
 | Read-aloud, boxed text, scene description | `ttrpg-create-readaloud` |
 | Web inspiration, naming, mythology, current rulings beyond local data | `ttrpg-research-web` |
 | Explicit image-generation request | `ttrpg-create-image-gen` |
 | Quick NPC sketch | `/npc`; save only if useful via vault authoring |
+
+Campaign design defaults to chat proposals. Explicit write/save/update wording
+authorizes a `status: draft` note via `ttrpg-vault-authoring`. One-session
+agendas and post-session reconciliation remain normal collaboration, not
+campaign design.
 
 Image generation is metered; only call it on explicit user request.
 
@@ -238,6 +246,10 @@ confirmation before deletion.
 - **Creative alternatives:** main agent retrieves and verifies relevant context →
   self-contained brief → `creative-brainstorm` parallel ideation and curation →
   main agent triages and implements the selected direction.
+- **Campaign/arc design:** navigation → `ttrpg-campaign-design` (loads its own
+  references) → `ttrpg-library-search` with read/`qmd get` evidence → optional
+  `creative-brainstorm` for structurally distinct options → chat proposals;
+  durable drafts via `ttrpg-vault-authoring`.
 - **Save durable prep:** navigation → `ttrpg-vault-authoring` → optional
   rich-note/canvas skill → write under `vault/notes/` → qmd refresh if needed.
 - **Promote old-vault material:** navigation → archive search/read →
