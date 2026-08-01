@@ -1,46 +1,33 @@
+// pi tool registration only. Description, prompt guidelines and the parameter
+// set all come from the canonical spec in .agents/cli/query-5etools/spec.mjs,
+// which also drives the CLI. Do not restate them here.
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "typebox";
-import { query5etools } from "./query-5etools.js";
+import { paramsToTypebox, type ToolSpec } from "../_lib/spec-typebox.js";
+// @ts-expect-error — canonical spec is plain ESM JavaScript, resolved at runtime.
+import { spec as rawSpec } from "../../../.agents/cli/query-5etools/spec.mjs";
+// @ts-expect-error — canonical implementation is plain ESM JavaScript.
+import { query5etools } from "../../../.agents/cli/query-5etools/query-5etools.js";
+
+const spec = rawSpec as ToolSpec;
 
 export default function query5etoolsExtension(pi: ExtensionAPI) {
   pi.registerTool({
-    name: "query_5etools",
+    name: spec.name,
     label: "Query 5etools",
-    description: "Structured queries over the local 5etools mirror for creatures, spells, and items.",
-    promptSnippet: "Query the local 5etools mirror for structured creature, spell, and item lookups.",
-    promptGuidelines: [
-      "Use query_5etools for canonical 5e creature/spell/item filters before using qmd prose search.",
-      "Use query_5etools with output='summary' for candidate lists, output='markdown' for rendered statblocks or spell/item text, and output='json' for raw records.",
-      "If query_5etools cannot express an unusual 5etools task, read the ttrpg-rules-5etools-native skill and use bash/node against imports/5etools directly.",
-    ],
-    parameters: Type.Object({
-      entityType: Type.String({
-        description: "Entity type: creature, spell, or item.",
-        default: "creature",
-      }),
-      name: Type.Optional(Type.String({ description: "Case-insensitive substring match on entity name." })),
-      source: Type.Optional(Type.Array(Type.String({ description: "5etools source code, e.g. MM, XMM, PHB, XPHB." }))),
-      cr: Type.Optional(Type.String({ description: "Creature CR or range, e.g. '5', '1/2', '5..7', '..3'." })),
-      type: Type.Optional(Type.Array(Type.String({ description: "Creature type filter, e.g. fey, undead." }))),
-      size: Type.Optional(Type.Array(Type.String({ description: "Creature size filter, e.g. small, medium, large." }))),
-      alignment: Type.Optional(Type.Array(Type.String({ description: "Creature alignment text filter, e.g. lawful good, neutral evil." }))),
-      environment: Type.Optional(Type.Array(Type.String({ description: "Creature environment filter, e.g. forest, desert." }))),
-      level: Type.Optional(Type.String({ description: "Spell level or range, e.g. '3' or '0..3'." })),
-      school: Type.Optional(Type.Array(Type.String({ description: "Spell school abbreviation or name, e.g. V, evo, evocation." }))),
-      class: Type.Optional(Type.Array(Type.String({ description: "Spell class filter, e.g. wizard, cleric." }))),
-      concentration: Type.Optional(Type.Boolean({ description: "Require concentration spells." })),
-      ritual: Type.Optional(Type.Boolean({ description: "Require ritual spells." })),
-      rarity: Type.Optional(Type.Array(Type.String({ description: "Item rarity filter, e.g. common, rare, legendary." }))),
-      kind: Type.Optional(Type.Array(Type.String({ description: "Item kind filter, e.g. weapon, armor, potion, ring, wondrous." }))),
-      attunement: Type.Optional(Type.Boolean({ description: "Require attunement." })),
-      output: Type.Optional(Type.String({ description: "Output mode: summary, json, or markdown.", default: "summary" })),
-      limit: Type.Optional(Type.Number({ description: "Max number of returned results. Default 10.", default: 10 })),
-      preferRuleset: Type.Optional(Type.String({ description: "Ruleset preference: 2014, 2024, or either.", default: "either" })),
-    }),
+    description: spec.description,
+    promptSnippet: spec.promptSnippet,
+    promptGuidelines: spec.promptGuidelines,
+    parameters: paramsToTypebox(spec),
     async execute(_toolCallId, params) {
       const result = await query5etools(params as Record<string, unknown>);
+      // `details` is not sent to the model — only `content` is. Putting the
+      // truncation notice only in details meant pi's model read "Found 10
+      // creatures" when 19 matched. Same rule as the CLI: no silent caps.
+      const text = result.truncated
+        ? `${result.text}\n\nNOTE: truncated — showing ${result.returnedCount} of ${result.totalMatches} matches. Raise \`limit\` to see the rest.`
+        : result.text;
       return {
-        content: [{ type: "text", text: result.text }],
+        content: [{ type: "text", text }],
         details: {
           query: result.query,
           totalMatches: result.totalMatches,

@@ -1,0 +1,236 @@
+#!/usr/bin/env node
+// .agents/harness — one lifecycle entrypoint for the whole toolchain.
+//
+//   bootstrap [--check|--apply]   probe prerequisites, scaffold .env, install
+//                                 per-tool environments, materialize the
+//                                 environment, report Tier L artifacts, sync
+//                                 adapters for detected harnesses
+//   doctor                        alias for `bootstrap --check`
+//   sync                          regenerate every adapter; idempotent
+//   verify                        structural checks + regenerate-and-diff +
+//                                 environment smoke tests
+//   vendor status|sync NAME|update NAME REF
+//
+// Node rather than bash because it must emit JS workflow files containing prose
+// with {braces} — a quoting minefield in shell.
+
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { parseToml } from "./harness-lib/toml.mjs";
+import { generateAll, orphanedArtifacts, syncClaudeSkills, writePlan } from "./harness-lib/sync.mjs";
+import { registerCodexMcp, runBootstrap } from "./harness-lib/bootstrap.mjs";
+import { runVerify } from "./harness-lib/verify.mjs";
+import { vendorStatus, vendorSync, vendorUpdate } from "./harness-lib/vendor.mjs";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+const COLORS = process.stdout.isTTY && !process.env.NO_COLOR;
+const paint = (code, s) => (COLORS ? `[${code}m${s}[0m` : s);
+const STATUS_COLOR = {
+  PASS: 32,
+  FAIL: 31,
+  SKIP: 90,
+  "WILL-FETCH-ON-USE": 33,
+  "…": 36,
+};
+
+function makeReport() {
+  let failed = 0;
+  return {
+    failed: () => failed,
+    header(title) {
+      process.stdout.write(`\n${paint(1, `ttrpg-agent harness — ${title}`)}\n`);
+    },
+    section(title) {
+      process.stdout.write(`\n${paint(1, title)}\n`);
+    },
+    row(status, name, detail = "", fix = "") {
+      if (status === "FAIL") failed += 1;
+      const tag = paint(STATUS_COLOR[status] ?? 0, status.padEnd(18));
+      process.stdout.write(`  ${tag} ${name}${detail ? `  ${paint(90, detail)}` : ""}\n`);
+      if (fix) process.stdout.write(`  ${" ".repeat(18)} ${paint(36, `→ ${fix}`)}\n`);
+    },
+  };
+}
+
+// Self-bootstrap. Every command needs the manifest, parsing the manifest needs
+// smol-toml, and on a fresh clone nothing is installed yet — so telling the
+// user to run `bootstrap --apply` would point them at a command that fails the
+// same way. Install our own declared dependencies on first run instead. This is
+// the harness's own project-local package, never anything global.
+function ensureHarnessDeps() {
+  const dir = path.join(ROOT, ".agents");
+  if (fs.existsSync(path.join(dir, "node_modules", "smol-toml"))) return true;
+  if (!fs.existsSync(path.join(dir, "package.json"))) return true;
+
+  process.stderr.write("→ first run: installing harness dependencies into .agents/node_modules …\n");
+  // Cannot use contractEnv() here — that needs the manifest, which needs the
+  // dependency we are installing. These two paths are fixed by the contract, so
+  // set them directly and keep even the very first npm run out of ~/.npm.
+  const res = spawnSync("npm", ["install", "--prefix", dir, "--no-audit", "--no-fund"], {
+    stdio: ["ignore", "ignore", "inherit"],
+    env: {
+      ...process.env,
+      npm_config_cache: path.join(ROOT, ".cache/npm"),
+      npm_config_logs_dir: path.join(ROOT, ".cache/npm/_logs"),
+    },
+  });
+  if (res.status === 0) {
+    process.stderr.write("→ done.\n\n");
+    return true;
+  }
+  process.stderr.write(
+    "\nCould not install the harness's dependencies automatically.\n" +
+      `  Run manually: npm install --prefix ${dir}\n` +
+      "  (npm and Node.js >= 22 are Tier G prerequisites — this script never installs those.)\n",
+  );
+  return false;
+}
+
+async function loadManifest() {
+  const p = path.join(ROOT, ".agents/manifest.toml");
+  if (!fs.existsSync(p)) {
+    process.stderr.write("missing .agents/manifest.toml\n");
+    process.exit(1);
+  }
+  if (!ensureHarnessDeps()) process.exit(1);
+  try {
+    return await parseToml(fs.readFileSync(p, "utf8"));
+  } catch (error) {
+    process.stderr.write(`.agents/manifest.toml: ${error.message}\n`);
+    process.exit(1);
+  }
+}
+
+function doSync(manifest, report, { apply = true } = {}) {
+  report.section("Adapters");
+  const plan = generateAll(ROOT, manifest);
+  const results = apply ? writePlan(ROOT, plan) : plan.map((p) => ({ rel: p.rel, state: "planned" }));
+  const changed = results.filter((r) => r.state !== "unchanged");
+  for (const r of results) {
+    report.row(r.state === "unchanged" ? "SKIP" : "PASS", r.rel, r.state);
+  }
+
+  // A renamed or removed prompt/chain leaves its old adapter behind, still
+  // offering a command that no longer exists. The drift check walks plan->disk
+  // and cannot see these.
+  const orphans = orphanedArtifacts(ROOT, plan);
+  if (orphans.length) {
+    report.section("Orphaned generated artifacts");
+    for (const rel of orphans) {
+      if (apply) fs.rmSync(path.join(ROOT, rel), { force: true });
+      report.row("PASS", rel, apply ? "removed (no longer generated)" : "orphaned");
+    }
+  }
+
+  report.section("Claude skill symlinks");
+  const links = syncClaudeSkills(ROOT, { apply });
+  const refused = links.filter((l) => l.state.startsWith("REFUSED"));
+  for (const l of links) {
+    if (l.state === "unchanged") continue;
+    report.row(l.state.startsWith("REFUSED") ? "FAIL" : "PASS", `.claude/skills/${l.name}`, l.state);
+  }
+  report.row(
+    refused.length ? "FAIL" : "PASS",
+    "skill symlinks",
+    `${links.length - refused.length} in place${refused.length ? `, ${refused.length} refused` : ""}`,
+  );
+  return changed.length;
+}
+
+function usage() {
+  process.stdout.write(
+    [
+      "Usage: .agents/harness <command>",
+      "",
+      "  bootstrap [--check|--apply]   check (default) or install; never installs Tier G",
+      "  doctor                        alias for `bootstrap --check`",
+      "  sync                          regenerate every harness adapter",
+      "  verify                        structural checks, drift diff, env smoke tests",
+      "  codex-mcp register [name]     add the MCP server to your GLOBAL Codex config",
+      "  codex-mcp remove [name]       undo that",
+      "  vendor status                 pinned ref vs actual checkout, per vendor",
+      "  vendor sync <name>            clone/fetch/checkout the pin, then build",
+      "  vendor update <name> <ref>    move the pin (explicit; never automatic)",
+      "",
+    ].join("\n"),
+  );
+}
+
+const [command, ...rest] = process.argv.slice(2);
+const manifest = await loadManifest();
+const report = makeReport();
+
+switch (command) {
+  case "bootstrap":
+  case "doctor": {
+    const apply = command === "bootstrap" && rest.includes("--apply");
+    const detected = runBootstrap(ROOT, manifest, { apply }, report);
+    vendorStatus(ROOT, manifest, report);
+    if (apply && detected.length) doSync(manifest, report, { apply: true });
+    report.section("Result");
+    const n = report.failed();
+    report.row(n ? "FAIL" : "PASS", command, n ? `${n} item(s) need attention` : "ready");
+    process.exit(n ? 1 : 0);
+  }
+
+  case "sync": {
+    report.header("sync");
+    doSync(manifest, report, { apply: true });
+    report.section("Result");
+    const n = report.failed();
+    report.row(n ? "FAIL" : "PASS", "sync", n ? `${n} problem(s)` : "adapters up to date");
+    process.exit(n ? 1 : 0);
+  }
+
+  case "verify": {
+    const n = runVerify(ROOT, manifest, report);
+    process.exit(n ? 1 : 0);
+  }
+
+  case "codex-mcp": {
+    // Explicit and user-initiated. Codex has no project scope, so the only way
+    // to give it an MCP server is to write the user's global config — which is
+    // why bootstrap only ever *reports* this and never does it.
+    const [sub, name] = rest;
+    try {
+      const target = name ?? (manifest.mcp ?? [])[0]?.name;
+      if (!target) throw new Error("no [[mcp]] entries in the manifest");
+      if (sub === "register" || sub === undefined) {
+        registerCodexMcp(ROOT, manifest, target, report);
+      } else if (sub === "remove") {
+        registerCodexMcp(ROOT, manifest, target, report, { remove: true });
+      } else {
+        throw new Error(`unknown codex-mcp subcommand: ${sub} (expected register|remove)`);
+      }
+    } catch (error) {
+      report.row("FAIL", "codex-mcp", error.message);
+    }
+    process.exit(report.failed() ? 1 : 0);
+  }
+
+  case "vendor": {
+    const [sub, name, ref] = rest;
+    report.header(`vendor ${sub ?? ""}`.trim());
+    try {
+      if (!sub || sub === "status") vendorStatus(ROOT, manifest, report);
+      else if (sub === "sync") {
+        if (!name) throw new Error("vendor sync needs a name");
+        vendorSync(ROOT, manifest, name, report);
+      } else if (sub === "update") {
+        if (!name || !ref) throw new Error("vendor update needs a name and a ref");
+        vendorUpdate(ROOT, manifest, name, ref, report);
+      } else throw new Error(`unknown vendor subcommand: ${sub}`);
+    } catch (error) {
+      report.row("FAIL", "vendor", error.message);
+    }
+    process.exit(report.failed() ? 1 : 0);
+  }
+
+  default:
+    usage();
+    process.exit(command ? 1 : 0);
+}

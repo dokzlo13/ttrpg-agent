@@ -1,0 +1,90 @@
+# /bootstrap
+
+Interactive first-run setup for a fresh `ttrpg-agent` clone. **You are the
+conversation; `.agents/harness` is the machinery.** Do not re-implement
+dependency checks, installs, or directory creation in chat — the script owns all
+of that, identically on every harness.
+
+Optional focus from the user: `$@`
+
+Hard rules:
+
+- Never print secrets. Do not paste `.env` contents back to the user.
+- `.env` may be created and edited. `imports/`, `vault/` and `.cache/` are
+  gitignored local data areas.
+- Never pre-fetch Tier L artifacts to "be helpful" — a fresh clone must be
+  usable without a multi-gigabyte download.
+- Do not make paid, metered, destructive, or network choices without explicit
+  consent.
+
+## 1. Check
+
+```bash
+.agents/harness bootstrap --check
+```
+
+Every row is `PASS` / `FAIL` / `SKIP` / `WILL-FETCH-ON-USE`, grouped by tier,
+with the exact remediation command where one exists.
+
+## 2. Explain, in plain language
+
+Do not read the table aloud. Say what is wrong, what it costs, and what to do:
+
+- **Tier G — their machine.** Anything failing here they must install
+  themselves; the script deliberately never installs system packages. Give them
+  the exact command from the report.
+- **Tier T — the project's own environments.** Fixable by this bootstrap.
+- **Tier L — downloads on first use.** Say the sizes out loud (~2.2 GB qmd
+  models, ~3.3 GB surya models, ~190 MB 5etools). These are **not** errors.
+- **`.env` gaps.** Which keys are unset and exactly what each one gates.
+
+## 3. Offer to apply
+
+If anything in Tier T or `.env` is fixable:
+
+```bash
+.agents/harness bootstrap --apply
+```
+
+That installs the harness's own dependencies and each tool's isolated
+environment, scaffolds `.env` from `.env.example`, materializes the cache
+layout, and syncs adapters for whichever harnesses are on `PATH`. It still never
+touches Tier G and never pre-fetches Tier L. Re-run `--check` afterwards and
+confirm what changed.
+
+## 4. Configure `.env` conversationally
+
+Read `_partials/bootstrap-context.md` and walk its subsections **one at a
+time** — ask, wait, write, summarize, then move to the next. Never dump every
+question at once. That partial also covers the optional data sources and the
+copyright/5etools posture.
+
+## 5. Optional data sources
+
+All optional; empty folders are fine. The 5etools mirror is a pinned vendor
+checkout rather than user content:
+
+```bash
+.agents/harness vendor status
+.agents/harness vendor sync 5etools     # ~190 MB, only if they want it
+```
+
+## 6. Verify
+
+```bash
+.agents/harness verify
+.agents/bin/qmd status
+.agents/bin/query-5etools --entity-type creature --name goblin --output summary
+```
+
+If the user added books, point them at `ttrpg-import-book-pdf` rather than
+running an ingest here — ingests are long and metered.
+
+## 7. Finish
+
+Tell them:
+
+- which harnesses were detected and configured;
+- what is still failing and whose job it is;
+- what will download on first use, and roughly when;
+- the two or three commands they will actually use day to day.

@@ -1,0 +1,12 @@
+{
+  "name": "vault-frontmatter",
+  "private": true,
+  "type": "module",
+  "description": "Read-only YAML frontmatter inspection/filtering over vault/notes and vault/library/books.",
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "scripts": {
+    "test": "node --test vault-frontmatter.test.js"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "_comment": "Project-local pi settings. Project resources in .pi/skills, .pi/prompts, .pi/agents, and .pi/extensions are auto-discovered; don't enumerate them here.",
+  "_comment": "Project-local pi settings. Canonical project resources live in .agents/ (skills, prompts, chains); pi discovers .agents/skills natively and reads the GENERATED .pi/prompts, .pi/agents and .pi/chains. Only .pi/extensions and this file are hand-authored. Run `.agents/harness sync` after editing anything under .agents/; don't enumerate resources here.",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
@@ -44,6 +44,6 @@
       }
     }
   },
-  "shellCommandPrefix": "source ./.pi/scripts/pi-shell.sh",
-  "_envOverrides": "The bash tool sources ./.pi/scripts/pi-shell.sh via shellCommandPrefix. That script sets TTRPG_* paths, sources project .env for optional feature/API keys, keeps qmd config/index state project-local under .qmd, keeps reusable model/cache state under .cache, sets QMD_LLAMA_GPU, and makes plain `qmd ...` commands project-local with lazy bootstrap. .pi/scripts/pi-launch.sh and .pi/scripts/pi-isolated.sh apply the same env for direct/manual qmd use. Don't put secrets in settings.json; pi only does deep merge on JSON."
+  "shellCommandPrefix": "source ./.agents/env.sh",
+  "_envOverrides": "The bash tool sources ./.agents/env.sh via shellCommandPrefix. That file is the canonical, harness-neutral environment contract: it sets TTRPG_* paths, sources project .env for optional feature/API keys, forces every cache project-local under .cache (index, xdg, uv, npm, huggingface, torch, vendor), sets QMD_LLAMA_GPU behaviour, and defines the qmd/qmd-cpu shell functions with lazy bootstrap. Correctness never depends on this prefix: .agents/bin/<tool> sources the same file, so tools work with no harness config at all. .agents/scripts/pi-launch.sh and .agents/scripts/pi-isolated.sh apply the same env for direct/manual use. Don't put secrets in settings.json; pi only does deep merge on JSON."
 }

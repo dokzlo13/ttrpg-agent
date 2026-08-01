@@ -1,4 +1,5 @@
 {
+  "_comment": "pi tool registration only. The implementation, its dependencies and its lockfile live in .agents/cli/vault-frontmatter/, beside the module that require()s yaml — node resolves from there.",
   "name": "vault-frontmatter-extension",
   "private": true,
   "type": "module",
@@ -6,11 +7,5 @@
     "extensions": [
       "./index.ts"
     ]
-  },
-  "dependencies": {
-    "yaml": "^2.7.0"
-  },
-  "scripts": {
-    "test": "node vault-frontmatter.test.js"
   }
 }

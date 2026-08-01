@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Tier 1 hermetic entrypoint: explicit archive -> vault/notes copies.
+set -uo pipefail
+
+# Resolve this script through any symlinks BEFORE deriving the repo root.
+# `ln -s <repo>/.agents/bin/qmd ~/.local/bin/qmd` would otherwise make
+# dirname/../.. evaluate to /home, and env.sh would build the whole project
+# skeleton there. Directory symlinks are handled by `cd`+`pwd -P`; this loop
+# covers file symlinks.
+_ttrpg_self="${BASH_SOURCE[0]}"
+while [ -L "$_ttrpg_self" ]; do
+  _ttrpg_link="$(readlink "$_ttrpg_self")"
+  case "$_ttrpg_link" in
+    /*) _ttrpg_self="$_ttrpg_link" ;;
+    *) _ttrpg_self="$(dirname -- "$_ttrpg_self")/$_ttrpg_link" ;;
+  esac
+done
+TTRPG_ROOT="$(cd -- "$(dirname -- "$_ttrpg_self")/../.." && pwd -P)"
+unset _ttrpg_self _ttrpg_link
+export TTRPG_ROOT
+# A tool must never emit env.sh's KEY=VALUE dump on its own stdout; on
+# .agents/bin/foundry-mcp that would corrupt the MCP JSON-RPC stream.
+unset TTRPG_ENV_DUMP
+# shellcheck disable=SC1091
+source "$TTRPG_ROOT/.agents/env.sh"
+
+exec uv run --project "$TTRPG_CLI_DIR/vault-sync" vault-sync "$@"

@@ -1,0 +1,313 @@
+# .agents/manifest.toml — capability declarations for the ttrpg-agent toolchain.
+#
+# This is the input to `.agents/harness sync`, which generates every harness
+# adapter under .claude/ and the derived parts of .pi/. Edit here, never there.
+#
+# Hand-authored and NOT generated: .pi/settings.json (provider/packages — pi
+# specific and not derivable), .pi/mcp.json (lifecycle overrides),
+# .pi/extensions/* (pi-only tool registration), and .claude/settings.local.json
+# (user-owned; the generator and verifier both skip it).
+
+[project]
+name = "ttrpg-agent"
+# Canonical instruction file. Claude cannot load AGENTS.md on its own, so sync
+# emits CLAUDE.md as a one-line @-import of this file.
+contract = "AGENTS.md"
+
+# --- model tiers ------------------------------------------------------------
+# Prompts and agents declare a TIER, never a model ID. `openai-codex/gpt-5.6-sol`
+# is pi routing syntax and is meaningless — actively harmful — in a Claude
+# command. Changing a model is a one-line edit here instead of a 13-file sweep.
+[tiers.primary]
+pi = "openai-codex/gpt-5.6-sol"
+claude = "opus"
+# Codex has no per-prompt model selection; it uses the session default.
+
+[tiers.fast]
+pi = "openai-codex/gpt-5.6-terra"
+claude = "sonnet"
+
+# Reasoning effort is a separate dimension from model tier.
+# NOTE: only the `pi` column is used for prompts (pi's `thinking:` frontmatter);
+# Claude commands carry no effort field. The `claude` column is consumed by the
+# generated chain workflow, which passes it as agent() `effort`.
+[effort]
+high = { pi = "high", claude = "high" }
+medium = { pi = "medium", claude = "medium" }
+low = { pi = "low", claude = "low" }
+
+# --- tools ------------------------------------------------------------------
+# Every tool is its own isolated environment; the language is an implementation
+# detail reached through .agents/bin/<name>. `runtime` selects the bootstrap
+# dispatch arm: python -> `uv sync --project`, node -> `npm install --prefix`.
+
+[[tool]]
+name = "book-ingest"
+runtime = "python"
+dir = ".agents/cli/book-ingest"
+bin = ["book-ingest", "marker-single"]
+notes = "Owns marker-pdf and its torch/CUDA wheels. This is why no global `uv tool install marker-pdf` is needed."
+
+[[tool]]
+name = "vault-sync"
+runtime = "python"
+dir = ".agents/cli/vault-sync"
+bin = ["vault-sync"]
+
+[[tool]]
+name = "vault-frontmatter"
+runtime = "node"
+dir = ".agents/cli/vault-frontmatter"
+bin = ["vault-frontmatter"]
+spec = ".agents/cli/vault-frontmatter/spec.mjs"
+pi_tool = "vault_frontmatter"
+
+[[tool]]
+name = "query-5etools"
+runtime = "node"
+dir = ".agents/cli/query-5etools"
+bin = ["query-5etools"]
+spec = ".agents/cli/query-5etools/spec.mjs"
+pi_tool = "query_5etools"
+# No dependencies of its own; reads $TTRPG_5ETOOLS_DIR.
+install = false
+
+[[tool]]
+name = "image-gen"
+runtime = "node"
+dir = ".agents/cli/image-gen"
+bin = ["generate-image"]
+spec = ".agents/cli/image-gen/spec.mjs"
+pi_tool = "generate_image"
+install = false
+
+[[tool]]
+name = "foundry-mcp"
+runtime = "node"
+dir = ".agents/cli/foundry-mcp"
+bin = ["foundry-mcp"]
+# Its dependencies live in the vendored upstream checkout, built on first run.
+install = false
+
+# --- MCP servers ------------------------------------------------------------
+# `type` is mandatory: Claude silently drops .mcp.json entries without it.
+# The command MUST be the hermetic entrypoint — MCP servers are spawned by the
+# harness itself and never see any env-injection mechanism.
+
+[[mcp]]
+name = "foundry-vtt"
+type = "stdio"
+command = "bash"
+args = [".agents/bin/foundry-mcp"]
+# Codex has no project-scope MCP config. Registering it writes the user's global
+# config, so bootstrap only ever offers this — never does it implicitly.
+codex_register = "codex mcp add foundry-vtt -- bash {root}/.agents/bin/foundry-mcp"
+
+# --- vendored upstream checkouts -------------------------------------------
+# Tier L: fetched on first use, never at clone time. `.agents/harness vendor
+# <status|sync|update NAME>`.
+
+[[vendor]]
+name = "5etools"
+repo = "https://github.com/5etools-mirror-3/5etools-src.git"
+ref = "v2.28.0"
+dest = ".cache/vendor/5etools"
+env = "TTRPG_5ETOOLS_DIR"
+size_hint = "~190 MB"
+
+[[vendor]]
+name = "foundry-vtt-mcp"
+repo = "https://github.com/TheStranjer/foundry-vtt-mcp.git"
+ref = "f52ee5bc2329db0dd5007aab55b46ec0a9710d58"
+dest = ".cache/vendor/foundry-vtt-mcp"
+build = "npm ci && npm run build"
+env = "FOUNDRY_MCP_UPSTREAM_DIR"
+size_hint = "~200 MB after build"
+
+# --- slash prompts ----------------------------------------------------------
+# Canonical bodies live in .agents/prompts/<name>.md with NO frontmatter.
+#
+# `skill` is a GUARANTEED PRELOAD in pi. Claude has no equivalent frontmatter
+# key, so the generator emits an explicit "load this skill first" preamble —
+# dropping it would silently downgrade /cleanup, a destructive command, from
+# "the safety skill is loaded" to "the body asks the model to please load it".
+#
+# Argument token: canonical bodies use pi's `$@`; the Claude adapter rewrites it
+# to `$ARGUMENTS`. Codex has no project prompts at all — the README documents
+# the fallback.
+
+[[prompt]]
+name = "bootstrap"
+description = "First-run interactive project bootstrap: dependency checks, .env config, optional data imports, smoke tests."
+effort = "high"
+
+[[prompt]]
+name = "cleanup"
+description = "Destructive cleanup/reset for vault, imports, ingested books, and qmd indexes."
+argument_hint = "[scope or paths]"
+tier = "fast"
+effort = "medium"
+skill = "ttrpg-system-data-cleanup"
+
+[[prompt]]
+name = "convert-monster"
+description = "Convert an OSR or non-5e monster into a 5e 2014/2024 statblock, ready for Foundry importer paste."
+argument_hint = "[monster name or statblock]"
+tier = "primary"
+effort = "high"
+skill = "ttrpg-rules-osr-to-5e"
+
+[[prompt]]
+name = "find-anything"
+description = "General-purpose search across books, notes, and optional archive using qmd hybrid mode."
+argument_hint = "[what to look for]"
+tier = "fast"
+effort = "low"
+skill = "ttrpg-library-search"
+
+[[prompt]]
+name = "find-monster"
+description = "Find a monster across canonical 5e data and ingested books. Tries query_5etools first, falls back to qmd."
+argument_hint = "[monster name]"
+tier = "fast"
+effort = "low"
+skill = "ttrpg-rules-5etools-query"
+
+[[prompt]]
+name = "foundry-monster"
+description = "Format an existing monster or conversion as importer-ready text plus optional post-import Foundry enrichers."
+argument_hint = "[monster name or statblock]"
+tier = "primary"
+effort = "medium"
+skill = "ttrpg-foundry-statblock-importer"
+
+[[prompt]]
+name = "illustrate"
+description = "Generate one TTRPG visual asset with OpenAI image generation."
+argument_hint = "[subject to illustrate]"
+tier = "primary"
+effort = "medium"
+skill = "ttrpg-create-image-gen"
+
+[[prompt]]
+name = "npc"
+description = "Generate a quick NPC sketch — name, look, voice, hook."
+argument_hint = "[role, vibe, or location]"
+tier = "fast"
+effort = "low"
+skill = "ttrpg-vault-authoring"
+
+[[prompt]]
+name = "readaloud"
+description = "Write a \"read aloud\" boxed-text passage for the table."
+argument_hint = "[scene to describe]"
+tier = "primary"
+effort = "medium"
+skill = "ttrpg-create-readaloud"
+
+# --- multi-agent chains -----------------------------------------------------
+
+[[chain]]
+name = "creative-brainstorm"
+spec = ".agents/chains/creative-brainstorm/spec.json"
+
+# --- Tier G prerequisites ---------------------------------------------------
+# Checked and reported by bootstrap. NEVER installed: these are the user's
+# machine, not the project's.
+
+[[prereq]]
+name = "git"
+probe = ["git", "--version"]
+
+[[prereq]]
+name = "node"
+probe = ["node", "--version"]
+min = "22"
+
+[[prereq]]
+name = "npm"
+probe = ["npm", "--version"]
+
+[[prereq]]
+name = "uv"
+probe = ["uv", "--version"]
+install_hint = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+
+[[prereq]]
+name = "qmd"
+probe = ["qmd", "--version"]
+install_hint = "npm install -g @tobil/qmd"
+
+[[prereq]]
+name = "rg"
+probe = ["rg", "--version"]
+install_hint = "apt install ripgrep"
+
+[[prereq]]
+name = "fd"
+probe = ["fdfind", "--version"]
+install_hint = "apt install fd-find"
+
+[[prereq]]
+name = "jq"
+probe = ["jq", "--version"]
+install_hint = "apt install jq"
+
+[[prereq]]
+name = "ip"
+probe = ["ip", "-V"]
+install_hint = "apt install iproute2"
+optional = true
+notes = "Only needed for Foundry MCP WSL host auto-discovery."
+
+# --- Tier L: lazily fetched, never pre-downloaded ---------------------------
+# Reported by bootstrap as "will download on first use", never fetched.
+
+[[lazy]]
+name = "qmd model GGUFs"
+size = "~2.2 GB"
+path = ".cache/xdg/qmd/models"
+trigger = "first `.agents/bin/qmd embed` or `query`"
+
+[[lazy]]
+name = "surya/datalab models"
+size = "~3.3 GB"
+path = ".cache/xdg/datalab"
+trigger = "first Marker run via `.agents/bin/book-ingest` or `.agents/bin/marker-single`"
+
+[[lazy]]
+name = "5etools mirror"
+size = "~190 MB"
+path = ".cache/vendor/5etools"
+trigger = "`.agents/harness vendor sync 5etools`"
+
+[[lazy]]
+name = "foundry-vtt-mcp upstream"
+size = "~200 MB after build"
+path = ".cache/vendor/foundry-vtt-mcp"
+trigger = "first `.agents/bin/foundry-mcp` start"
+
+# --- harness adapters -------------------------------------------------------
+
+[harness.pi]
+detect = ["pi", "--version"]
+skills = "native"           # pi reads .agents/skills directly
+prompts = ".pi/prompts"     # generated: canonical body CONCATENATED + frontmatter
+agents = ".pi/agents"
+chains = ".pi/chains"
+
+[harness.claude]
+detect = ["claude", "--version"]
+skills = ".claude/skills"   # generated: symlinks into .agents/skills
+prompts = ".claude/commands"
+settings = ".claude/settings.json"
+workflows = ".claude/workflows"
+# Never generated, never overwritten, exempt from the regenerate-and-diff check.
+user_owned = [".claude/settings.local.json"]
+
+[harness.codex]
+detect = ["codex", "--version"]
+skills = "native"           # codex reads .agents/skills directly
+prompts = false             # user-scope only; no project prompts exist
+mcp = false                 # no project config of any kind
+hooks = false

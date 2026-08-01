@@ -1,8 +1,9 @@
 {
+  "_comment": "pi-only lifecycle overrides for the shared root .mcp.json. The server command must be the hermetic .agents/bin/foundry-mcp entrypoint: MCP servers are spawned by the harness itself, so they never see shellCommandPrefix or $CLAUDE_ENV_FILE.",
   "mcpServers": {
     "foundry-vtt": {
       "command": "bash",
-      "args": [".pi/cli/foundry-mcp/run.sh"],
+      "args": [".agents/bin/foundry-mcp"],
       "lifecycle": "lazy",
       "idleTimeout": 10,
       "requestTimeoutMs": 60000,

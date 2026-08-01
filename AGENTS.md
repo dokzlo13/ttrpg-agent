@@ -1,9 +1,14 @@
 # AGENTS.md
 
-You are running inside **ttrpg-agent**, a Pi-powered workspace for D&D/TTRPG
-session prep, local reference search, and book ingestion. Be a creative
-collaborator by default, but treat this file as the project contract for source
-priority, skill routing, and data boundaries.
+You are running inside **ttrpg-agent**, a workspace for D&D/TTRPG session prep,
+local reference search, and book ingestion. Be a creative collaborator by
+default, but treat this file as the project contract for source priority, skill
+routing, and data boundaries.
+
+The project runs under three harnesses — pi, Claude Code, and Codex. Everything
+in this contract applies to all of them. Where they genuinely differ, see
+[Harness portability](#harness-portability) at the end; do not assume a
+capability that your harness has not actually given you.
 
 ## Non-negotiables
 
@@ -12,12 +17,17 @@ priority, skill routing, and data boundaries.
 - **Local sources beat memory.** For rules facts, book references, and campaign
   details, search local data first.
 - **Do not edit imports.** `imports/source-vault/`, `imports/books/`, and
-  `imports/5etools/` are read-only.
+  `.cache/vendor/5etools/` are read-only.
 - **Do not hand-edit ingested books.** Use `book-ingest` /
   `ttrpg-import-book-pdf` for `vault/library/books/` changes.
 - **Do not commit.** The user reviews all repo and data changes before commit.
-- **Use project Python conventions.** Never run raw `python` / `python3`; use
-  `uv run python ...` or `uv run --project .pi/cli/<tool> ...`.
+- **Use the project's tool entrypoints.** Every tool has a hermetic launcher at
+  `.agents/bin/<tool>`; use it rather than a bare `qmd`, `marker_single`, or a
+  raw `uv run`. A bare invocation runs outside the environment contract and
+  writes gigabytes of model weights outside the project. Never run raw
+  `python` / `python3`.
+- **Run project commands from the repository root.** Paths in these skills are
+  repo-root-relative, and Claude and Codex persist the cwd across `cd`.
 - **No heuristic smart decisions in tools.** If a pipeline/tool/plugin must
   classify, infer, tag, summarize, or choose semantic metadata, use an LLM or
   leave the field empty/unknown. Do not add regex/text-heuristic fallback guesses.
@@ -45,13 +55,14 @@ skills when creating durable active-vault content.
 
 | Path | Read? | Write? | Purpose |
 |---|---:|---:|---|
-| `.pi/` | yes | sparingly | Project machinery: skills, prompts, agents, CLI tools. |
-| `.qmd/` | no | qmd/system skills | Rebuildable qmd index/config state. |
-| `.cache/` | no | tooling only | Persistent project-local qmd/Marker/HuggingFace/torch/uv model/cache state; preserve across qmd/ingest wipeouts. |
+| `.agents/` | yes | it *is* the project | Canonical toolchain: `env.sh`, `bin/`, `cli/`, `skills/`, `prompts/`, `chains/`. See `.agents/README.md`. |
+| `.agents/state/` | no | tooling only | Durable gitignored state (Foundry credential). Never a cleanup target. |
+| `.pi/`, `.claude/` | yes | **mostly generated** | Harness adapters. Emitted by `.agents/harness sync` — do not hand-edit. Hand-authored exceptions: `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `.claude/settings.local.json`. |
+| `.cache/` | no | tooling only | Single cache root. Rebuildable: `xdg/qmd/index.sqlite*`, `index/index.yml`. **Must survive cleanup:** `xdg/qmd/models/` and `xdg/datalab/` (~5.5 GB), `huggingface/`, `torch/`, `uv/`, `npm/`, `vendor/`. |
+| `.cache/vendor/5etools/` | yes | no | Canonical 5e data mirror — a pinned vendor checkout, reached via `$TTRPG_5ETOOLS_DIR`. |
 | `imports/books/` | file list/input only | no | Raw books supplied by the user. |
 | `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
-| `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports. |
-| `imports/5etools/` | yes | no | Local canonical 5e data mirror. |
+| `imports/fvtt-data/` | yes | **yes** | The one writable exception under `imports/`: local staging for targeted Foundry VTT exports. |
 | `vault/notes/` | yes | yes | Active authored campaign notes and table prep. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. |
 
@@ -223,6 +234,12 @@ Image generation is metered; only call it on explicit user request.
 |---|---|
 | qmd refresh/reindex/rebuild/collection verification | `ttrpg-system-qmd-maintenance` |
 | Destructive cleanup/reset/purge/remove of vault/import/index data | `ttrpg-system-data-cleanup` |
+| Add/change a skill, prompt, tool, MCP server, or harness adapter; a harness stops discovering project resources; caches leak outside the project; something under `.claude/` or `.pi/` looks hand-edited | `ttrpg-harness-engineering` |
+| First-run setup, dependency check, `.env` configuration | `/bootstrap`, or `.agents/harness doctor` directly |
+
+`ttrpg-harness-engineering` operates on the toolchain only. It must never touch
+`vault/`, `imports/`, or the contents of `.cache/`; when a toolchain change needs
+live-data evidence, it hands off to the relevant `ttrpg-*` skill.
 
 Destructive cleanup always requires exact scope, dry-run inventory, and explicit
 confirmation before deletion.
@@ -259,14 +276,28 @@ confirmation before deletion.
 
 ## Subagents and prompt shortcuts
 
-Use subagents when context/log volume would balloon or independent creative exploration materially improves the result:
+Use subagents when context/log volume would balloon or independent creative
+exploration materially improves the result.
+
+**Available on every harness:**
+
+- Open-ended creative design with several viable directions →
+  `creative-brainstorm`. Under pi this is the saved chain; under Claude Code it
+  is `.claude/workflows/creative-brainstorm.js`. Its ideator and curator agents
+  are internal stages — do not invoke them directly. Both are generated from
+  `.agents/chains/creative-brainstorm/spec.json`. Codex has no parallel runner:
+  do the four lenses inline, one at a time, keeping them genuinely independent.
+
+**pi only** — `statblock-converter` and `researcher` are pi subagent definitions
+in `.pi/agents/` and deliberately have no Claude or Codex equivalent:
 
 - One non-5e statblock conversion → `statblock-converter`.
 - Broad fact-finding across books/notes/archive/web → `researcher`.
-- Open-ended creative design with several viable directions → `creative-brainstorm` saved chain; its ideator and curator agents are internal stages.
 
-When using `subagent(...)`, omit `output` unless you want a real output file
-path. Do **not** pass `output: false`; this runtime may stringify it.
+On Claude Code or Codex, do that work inline instead — read
+`ttrpg-rules-osr-to-5e` for the conversion, or `ttrpg-library-search` plus
+`ttrpg-research-web` for fact-finding. The routing is a convenience, never a
+prerequisite; nothing downstream depends on a subagent having run.
 
 Prompt shortcuts include:
 
@@ -276,12 +307,17 @@ Prompt shortcuts include:
 | `/find-anything` | qmd/library search across books/notes/archive; optional `vault_frontmatter` scout for broad/unclear metadata |
 | `/convert-monster` | OSR/non-5e monster → 5e + Foundry importer text |
 | `/foundry-monster` | normalize existing monster for Foundry importer |
+| `/bootstrap` | first-run setup: prerequisites, `.env`, optional data sources, smoke tests |
 | `/cleanup` | destructive cleanup workflow with confirmation |
 | `/npc` | quick NPC sketch |
 | `/readaloud` | boxed text / scene opener |
 | `/illustrate` | explicit image-generation request |
 
 Prompt shortcuts do not replace source-backed lookup.
+
+**Codex has no project slash prompts** — user-scope only. Under Codex, name the
+workflow instead ("run the cleanup workflow") and load the matching skill; the
+prompt bodies live in `.agents/prompts/<name>.md` and can be read directly.
 
 ## Citations and copyright posture
 
@@ -291,7 +327,13 @@ Prefer paraphrase with citations like:
 
 - `vault/library/books/<slug>/<chapter>.md:<line>`
 - `imports/source-vault/<path>`
-- `imports/5etools/data/...`
+- `.cache/vendor/5etools/data/...`
+
+5etools moved from `imports/5etools/` to `.cache/vendor/5etools/` — it is a
+pinned, re-clonable vendor checkout, not user input. No existing vault note
+cited the old path, so there is no live discontinuity; if you ever meet one in
+older material, leave it alone (vault notes are user data) and cite the new path
+going forward. Prefer `$TTRPG_5ETOOLS_DIR` in commands.
 
 ## Handling uncertainty
 
@@ -311,7 +353,54 @@ Prefer paraphrase with citations like:
 - Don't commit user data, qmd indexes, PDFs, 5etools clones, Obsidian state,
   generated images, or vault notes.
 - Don't change `.pi/settings.json` `defaultProvider` without instruction.
+- Don't hand-edit generated adapters: anything under `.claude/` except
+  `settings.local.json`, plus `.pi/prompts/`, `.pi/chains/`, `.pi/agents/`,
+  `.mcp.json` and `CLAUDE.md`. Change `.agents/` and run `.agents/harness sync`.
 - Don't propose paid-cloud workflows when a local OSS path exists.
 - Don't hand-edit `vault/library/books/`; re-ingest instead.
 - Don't leave durable notes isolated: add body wikilinks and useful
   connections.
+
+## Harness portability
+
+The project is one set of capabilities; each harness discovers a different
+subset. `.agents/` is canonical, `.pi/` and `.claude/` are generated adapters.
+
+| Capability | pi | Claude Code | Codex |
+|---|---|---|---|
+| Skills | native from `.agents/skills/` | via generated `.claude/skills/` symlinks | native from `.agents/skills/` |
+| This contract | `AGENTS.md` | `CLAUDE.md` → `@AGENTS.md` | `AGENTS.md` |
+| Slash prompts | `.pi/prompts/` | `.claude/commands/` | **none** — read `.agents/prompts/<name>.md` |
+| MCP | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers` | **none** — needs a one-time `codex mcp add` |
+| Bare `qmd …` works | yes | yes | **no** — shell functions do not cross |
+| Parallel subagents | chain runner | `.claude/workflows/*.js` | no |
+
+Two rules follow from this and apply everywhere:
+
+1. **Call tools through `.agents/bin/<tool>`.** That entrypoint sources the
+   environment contract itself, so it is correct with zero harness
+   configuration. A bare `qmd`/`marker_single` may happen to work under pi and
+   Claude, but it is outside the contract and will scatter multi-gigabyte model
+   caches into `~/.cache/`. Under Codex it simply fails.
+2. **Never assume a harness feature is present.** If something you want exists
+   only under pi, say so and do the work inline rather than silently skipping it.
+
+## pi-only capabilities
+
+Available when running under pi, absent elsewhere. None is load-bearing.
+
+- **`subagent(...)`** and the `.pi/agents/` definitions (`researcher`,
+  `statblock-converter`). When calling it, omit `output` unless you want a real
+  output file path — do **not** pass `output: false`; this runtime may stringify it.
+- **The chain runner** (`.pi/chains/*.json`) for parallel multi-stage work.
+- **`mcp({...})`** as a runtime meta-tool: inspect server status, list discovered
+  tools, reconnect mid-session. Claude and Codex attach MCP at session start
+  only — the equivalent of `mcp({connect: ...})` there is restarting the session.
+- **`/reload`** to pick up changed project resources without restarting.
+- **`.pi/settings.json`** — provider, model routing, packages, compaction,
+  `shellCommandPrefix`. Hand-authored, not generated.
+- **`.agents/scripts/pi-isolated.sh`** — run pi ignoring the user's global
+  `~/.pi/agent/` entirely.
+- **Conditional skills** — `ttrpg-wsl-sync` is surfaced by a `resources_discover`
+  extension only when `TTRPG_WINDOWS_AGENT_DIR` is set. Other harnesses see it
+  only if they read `.agents/conditional-skills/` directly.

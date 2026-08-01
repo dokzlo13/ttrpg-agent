@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Harness launcher: Codex, with the project environment contract applied.
+#
+# Codex has no project-scope configuration of any kind — no config.toml, no
+# hooks, no prompts, no MCP. Its only lever is that the default
+# shell_environment_policy inherit="all" carries the *parent process*
+# environment into every tool shell. So sourcing env.sh here and then exec'ing
+# codex is how Codex gets Tier 2 at all.
+#
+# Env vars ride in; shell FUNCTIONS do not (Codex spawns a fresh login shell per
+# command). A bare `qmd ...` therefore will NOT work under Codex — use the
+# hermetic .agents/bin/qmd entrypoint, which is what skills reference anyway.
+#
+# Note: env.sh sources .env with `set -a`, and Codex 0.146's
+# ignore_default_excludes appears to be a no-op, so OPENAI_API_KEY reaches every
+# Codex tool shell. That is required for book-ingest's LLM follow-ons and is
+# intentional here; tighten with `include_only` if the posture ever needs it.
+set -uo pipefail
+
+# Resolve this script through any symlinks BEFORE deriving the repo root.
+# `ln -s <repo>/.agents/bin/qmd ~/.local/bin/qmd` would otherwise make
+# dirname/../.. evaluate to /home, and env.sh would build the whole project
+# skeleton there. Directory symlinks are handled by `cd`+`pwd -P`; this loop
+# covers file symlinks.
+_ttrpg_self="${BASH_SOURCE[0]}"
+while [ -L "$_ttrpg_self" ]; do
+  _ttrpg_link="$(readlink "$_ttrpg_self")"
+  case "$_ttrpg_link" in
+    /*) _ttrpg_self="$_ttrpg_link" ;;
+    *) _ttrpg_self="$(dirname -- "$_ttrpg_self")/$_ttrpg_link" ;;
+  esac
+done
+TTRPG_ROOT="$(cd -- "$(dirname -- "$_ttrpg_self")/../.." && pwd -P)"
+unset _ttrpg_self _ttrpg_link
+export TTRPG_ROOT
+# A tool must never emit env.sh's KEY=VALUE dump on its own stdout; on
+# .agents/bin/foundry-mcp that would corrupt the MCP JSON-RPC stream.
+unset TTRPG_ENV_DUMP
+# shellcheck disable=SC1091
+source "$TTRPG_ROOT/.agents/env.sh"
+cd "$TTRPG_ROOT" || exit 1
+
+real_bin="$(_ttrpg_resolve_real_bin codex || true)"
+if [ -z "$real_bin" ]; then
+  printf 'codex: not found on PATH (excluding %s). Install the Codex CLI first.\n' \
+    "$TTRPG_BIN_DIR" >&2
+  exit 127
+fi
+
+exec "$real_bin" "$@"

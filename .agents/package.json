@@ -1,0 +1,12 @@
+{
+  "name": "ttrpg-harness",
+  "private": true,
+  "type": "module",
+  "description": "Lifecycle tooling for the ttrpg-agent multi-harness toolchain: bootstrap, doctor, sync, verify, vendor.",
+  "bin": {
+    "ttrpg-harness": "./harness"
+  },
+  "dependencies": {
+    "smol-toml": "^1.4.2"
+  }
+}

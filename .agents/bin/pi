@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Harness launcher: pi, with the project environment contract applied.
+#
+# pi does not need this for Tier 2 — .pi/settings.json sets
+# shellCommandPrefix: "source ./.agents/env.sh". This launcher makes a manual
+# `pi` start behave identically regardless of cwd, and localizes qmd for direct
+# use in the terminal you launched from.
+#
+# For *full* isolation that ignores the user's global ~/.pi/agent/, use
+# .agents/scripts/pi-isolated.sh instead.
+set -uo pipefail
+
+# Resolve this script through any symlinks BEFORE deriving the repo root.
+# `ln -s <repo>/.agents/bin/qmd ~/.local/bin/qmd` would otherwise make
+# dirname/../.. evaluate to /home, and env.sh would build the whole project
+# skeleton there. Directory symlinks are handled by `cd`+`pwd -P`; this loop
+# covers file symlinks.
+_ttrpg_self="${BASH_SOURCE[0]}"
+while [ -L "$_ttrpg_self" ]; do
+  _ttrpg_link="$(readlink "$_ttrpg_self")"
+  case "$_ttrpg_link" in
+    /*) _ttrpg_self="$_ttrpg_link" ;;
+    *) _ttrpg_self="$(dirname -- "$_ttrpg_self")/$_ttrpg_link" ;;
+  esac
+done
+TTRPG_ROOT="$(cd -- "$(dirname -- "$_ttrpg_self")/../.." && pwd -P)"
+unset _ttrpg_self _ttrpg_link
+export TTRPG_ROOT
+# A tool must never emit env.sh's KEY=VALUE dump on its own stdout; on
+# .agents/bin/foundry-mcp that would corrupt the MCP JSON-RPC stream.
+unset TTRPG_ENV_DUMP
+# shellcheck disable=SC1091
+source "$TTRPG_ROOT/.agents/env.sh"
+cd "$TTRPG_ROOT" || exit 1
+
+real_bin="$(_ttrpg_resolve_real_bin pi || true)"
+if [ -z "$real_bin" ]; then
+  printf 'pi: not found on PATH (excluding %s). Install pi first.\n' \
+    "$TTRPG_BIN_DIR" >&2
+  exit 127
+fi
+
+exec "$real_bin" "$@"

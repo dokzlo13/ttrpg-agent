@@ -1,0 +1,9 @@
+{
+  "name": "image-gen",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI image generation with a paired Markdown asset note under vault/notes/images.",
+  "scripts": {
+    "test": "node --test image-gen.test.js"
+  }
+}

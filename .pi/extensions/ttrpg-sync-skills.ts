@@ -37,8 +37,13 @@ export default function (pi: ExtensionAPI) {
 		const windowsAgentDir = readDotEnvValue(projectRoot, "TTRPG_WINDOWS_AGENT_DIR");
 		if (!windowsAgentDir) return;
 
+		// Conditional skills are canonical content under .agents/, not pi assets.
+		// pi discovers .agents/skills natively; this hook adds the WSL sync skill
+		// only when the Windows mirror is actually configured.
 		return {
-			skillPaths: [join(projectRoot, ".pi", "conditional-skills", "ttrpg-wsl-sync", "SKILL.md")],
+			skillPaths: [
+				join(projectRoot, ".agents", "conditional-skills", "ttrpg-wsl-sync", "SKILL.md"),
+			],
 		};
 	});
 }

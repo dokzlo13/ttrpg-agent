@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Tier 1 hermetic entrypoint: the Foundry VTT MCP stdio server.
+#
+# MCP servers are spawned by the harness itself, not by its Bash tool, so they
+# never see Claude's $CLAUDE_ENV_FILE injection or pi's shellCommandPrefix. MCP
+# is therefore a Tier-1-only path on *every* harness by construction — which is
+# exactly why this launcher exists rather than relying on env injection.
+set -uo pipefail
+
+# Resolve this script through any symlinks BEFORE deriving the repo root.
+# `ln -s <repo>/.agents/bin/qmd ~/.local/bin/qmd` would otherwise make
+# dirname/../.. evaluate to /home, and env.sh would build the whole project
+# skeleton there. Directory symlinks are handled by `cd`+`pwd -P`; this loop
+# covers file symlinks.
+_ttrpg_self="${BASH_SOURCE[0]}"
+while [ -L "$_ttrpg_self" ]; do
+  _ttrpg_link="$(readlink "$_ttrpg_self")"
+  case "$_ttrpg_link" in
+    /*) _ttrpg_self="$_ttrpg_link" ;;
+    *) _ttrpg_self="$(dirname -- "$_ttrpg_self")/$_ttrpg_link" ;;
+  esac
+done
+TTRPG_ROOT="$(cd -- "$(dirname -- "$_ttrpg_self")/../.." && pwd -P)"
+unset _ttrpg_self _ttrpg_link
+export TTRPG_ROOT
+# A tool must never emit env.sh's KEY=VALUE dump on its own stdout; on
+# .agents/bin/foundry-mcp that would corrupt the MCP JSON-RPC stream.
+unset TTRPG_ENV_DUMP
+# shellcheck disable=SC1091
+source "$TTRPG_ROOT/.agents/env.sh"
+
+exec bash "$TTRPG_CLI_DIR/foundry-mcp/run.sh" "$@"

@@ -1,0 +1,6 @@
+{
+  "name": "query-5etools",
+  "private": true,
+  "type": "module",
+  "description": "Structured creature/spell/item queries over the pinned 5etools mirror."
+}
