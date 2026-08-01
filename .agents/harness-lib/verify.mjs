@@ -278,8 +278,12 @@ export function runVerify(root, manifest, report) {
     "\\.pi/extensions/query-5etools/query-5etools\\.js",
     "\\.pi/extensions/vault-frontmatter/vault-frontmatter\\.js",
   ].join("|");
+  // Exclude this file: it *defines* the patterns, so scanning it always
+  // matches. (It only started failing once it became tracked — `git ls-files`
+  // skipped it while it was untracked on the feature branch.)
   const stale = bash(
-    'git ls-files | grep -v "^\\.trash/" | xargs grep -lE "$MOVED" 2>/dev/null | sort',
+    'git ls-files | grep -v "^\\.trash/" | grep -v "^\\.agents/harness-lib/verify\\.mjs$" ' +
+      '| xargs grep -lE "$MOVED" 2>/dev/null | sort',
     { vars: { MOVED: movedPrefixes }, cwd: root },
   );
   const staleFiles = (stale.out || "").split("\n").filter(Boolean);
