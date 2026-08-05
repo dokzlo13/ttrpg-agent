@@ -24,20 +24,19 @@ server the right vendor and credential paths.
 |---|---|---|
 | pi | root `.mcp.json`, plus `.pi/mcp.json` for lifecycle overrides | supports lazy start and idle timeout |
 | Claude Code | root `.mcp.json` + `enabledMcpjsonServers` in `.claude/settings.json` | entries **must** carry `"type": "stdio"` or Claude silently drops them |
-| Codex | **no project scope** — register once, globally: `.agents/harness codex-mcp register foundry-vtt` | writes the user's global config, so only do this when asked |
+| Codex | generated `.codex/config.toml` | available only when Codex runs in this trusted project |
 
-**If a Codex session reports no Foundry tools at all, this registration is the
-first thing to check** — it is the single most common cause, and it is invisible
-from inside the session because Codex simply has no such tool namespace:
+**If a Codex session reports no Foundry tools at all, check project discovery
+first:**
 
 ```bash
-codex mcp get foundry-vtt                        # "No MCP server named ..." => not registered
-.agents/harness doctor                           # reports the state and the fix
-.agents/harness codex-mcp register foundry-vtt   # explicit, user-initiated
-.agents/harness codex-mcp remove foundry-vtt     # undo
+cd /path/to/ttrpg-agent
+codex mcp get foundry-vtt                        # reads .codex/config.toml
+.agents/harness doctor                           # checks project discovery and global isolation
 ```
 
-Codex attaches MCP servers at session start, so **restart Codex** afterwards.
+Codex attaches MCP servers at session start, so **restart Codex** after syncing
+or changing the configuration.
 
 ## Boundaries
 
@@ -90,8 +89,10 @@ Codex attaches MCP servers at session start, so **restart Codex** afterwards.
    `.env` or launcher-only changes.
 
 The runtime bootstrap discovers the active world, resolves the exact configured
-username to Foundry's internal user document ID, writes upstream credentials
-with mode `0600`, and then starts MCP. It does not create Foundry users.
+username to Foundry's internal user document ID, ensures the upstream
+credential cache is current with mode `0600`, and then starts MCP. An unchanged
+cache is not rewritten, so an already-configured Codex session can start under
+a read-only sandbox. It does not create Foundry users.
 
 ## Diagnostics
 

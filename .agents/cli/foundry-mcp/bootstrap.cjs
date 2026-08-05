@@ -106,9 +106,21 @@ async function main() {
     password,
   }];
 
+  const serialized = `${JSON.stringify(credentials, null, 2)}\n`;
+  try {
+    const current = fs.readFileSync(credentialsPath, "utf8");
+    const mode = fs.statSync(credentialsPath).mode & 0o777;
+    if (current === serialized && mode === 0o600) {
+      console.error(`[foundry-vtt-mcp] Credentials already current for user "${username || userId}" in world "${status.world}" at ${endpoint.host}`);
+      return;
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
   fs.mkdirSync(path.dirname(credentialsPath), {recursive: true});
   const temporaryPath = `${credentialsPath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporaryPath, `${JSON.stringify(credentials, null, 2)}\n`, {mode: 0o600});
+  fs.writeFileSync(temporaryPath, serialized, {mode: 0o600});
   fs.renameSync(temporaryPath, credentialsPath);
   fs.chmodSync(credentialsPath, 0o600);
   console.error(`[foundry-vtt-mcp] Prepared credentials for user "${username || userId}" in world "${status.world}" at ${endpoint.host}`);

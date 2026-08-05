@@ -5,7 +5,7 @@ import path from "node:path";
 
 const cliDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(cliDir, "../../..");
-const upstreamDir = process.env.FOUNDRY_MCP_UPSTREAM_DIR || path.join(projectRoot, ".cache/foundry-vtt-mcp/upstream");
+const upstreamDir = process.env.FOUNDRY_MCP_UPSTREAM_DIR || path.join(projectRoot, ".cache/vendor/foundry-vtt-mcp");
 const sdkRoot = path.join(upstreamDir, "node_modules/@modelcontextprotocol/sdk/dist/client");
 const {Client} = await import(pathToFileURL(path.join(sdkRoot, "index.js")));
 const {StdioClientTransport} = await import(pathToFileURL(path.join(sdkRoot, "stdio.js")));

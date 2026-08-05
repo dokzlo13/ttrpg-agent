@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Harness launcher: Codex, with the project environment contract applied.
 #
-# Codex has no project-scope configuration of any kind — no config.toml, no
-# hooks, no prompts, no MCP. Its only lever is that the default
+# Codex has project-scoped MCP configuration in `.codex/config.toml`, but no
+# project hooks or prompts. The environment contract's only lever is that the default
 # shell_environment_policy inherit="all" carries the *parent process*
 # environment into every tool shell. So sourcing env.sh here and then exec'ing
 # codex is how Codex gets Tier 2 at all.

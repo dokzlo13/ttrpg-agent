@@ -204,6 +204,33 @@ export function runVerify(root, manifest, report) {
     }
   }
 
+  const codexAvailable = run("codex", ["--version"]).ok;
+  const codexConfigPath = path.join(root, ".codex/config.toml");
+  if (!codexAvailable) {
+    report.row("SKIP", ".codex/config.toml", "Codex not installed");
+  } else if (!fs.existsSync(codexConfigPath)) {
+    bad(".codex/config.toml", "missing", ".agents/harness sync");
+  } else {
+    let codexProblems = 0;
+    for (const m of manifest.mcp ?? []) {
+      const project = run("codex", ["mcp", "get", m.name], { cwd: root });
+      if (!project.ok) {
+        bad(`Codex MCP ${m.name}`, "not discovered from the project config", ".agents/harness sync, then restart Codex in this repository");
+        codexProblems += 1;
+      }
+      const outsideProject = run("codex", ["mcp", "get", m.name], {
+        cwd: path.parse(root).root,
+      });
+      if (outsideProject.ok) {
+        bad(`Codex MCP ${m.name} isolation`, "also registered in the user-level config", `run from outside this repo: codex mcp remove ${m.name}`);
+        codexProblems += 1;
+      }
+    }
+    if (!codexProblems) {
+      ok(".codex/config.toml", "all MCP servers are project-scoped and absent globally");
+    }
+  }
+
   // --- tool deps -----------------------------------------------------------
   report.section("Tool environments");
   const yamlDir = path.join(root, ".agents/cli/vault-frontmatter/node_modules/yaml");

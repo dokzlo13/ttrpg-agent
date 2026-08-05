@@ -57,7 +57,7 @@ skills when creating durable active-vault content.
 |---|---:|---:|---|
 | `.agents/` | yes | it *is* the project | Canonical toolchain: `env.sh`, `bin/`, `cli/`, `skills/`, `prompts/`, `chains/`. See `.agents/README.md`. |
 | `.agents/state/` | no | tooling only | Durable gitignored state (Foundry credential). Never a cleanup target. |
-| `.pi/`, `.claude/` | yes | **mostly generated** | Harness adapters. Emitted by `.agents/harness sync` — do not hand-edit. Hand-authored exceptions: `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `.claude/settings.local.json`. |
+| `.pi/`, `.claude/`, `.codex/` | yes | **mostly generated** | Harness adapters. Emitted by `.agents/harness sync` — do not hand-edit. Hand-authored exceptions: `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `.claude/settings.local.json`. |
 | `.cache/` | no | tooling only | Single cache root. Rebuildable: `xdg/qmd/index.sqlite*`, `index/index.yml`. **Must survive cleanup:** `xdg/qmd/models/` and `xdg/datalab/` (~5.5 GB), `huggingface/`, `torch/`, `uv/`, `npm/`, `vendor/`. |
 | `.cache/vendor/5etools/` | yes | no | Canonical 5e data mirror — a pinned vendor checkout, reached via `$TTRPG_5ETOOLS_DIR`. |
 | `imports/books/` | file list/input only | no | Raw books supplied by the user. |
@@ -355,7 +355,7 @@ going forward. Prefer `$TTRPG_5ETOOLS_DIR` in commands.
 - Don't change `.pi/settings.json` `defaultProvider` without instruction.
 - Don't hand-edit generated adapters: anything under `.claude/` except
   `settings.local.json`, plus `.pi/prompts/`, `.pi/chains/`, `.pi/agents/`,
-  `.mcp.json` and `CLAUDE.md`. Change `.agents/` and run `.agents/harness sync`.
+  `.mcp.json`, `.codex/config.toml`, and `CLAUDE.md`. Change `.agents/` and run `.agents/harness sync`.
 - Don't propose paid-cloud workflows when a local OSS path exists.
 - Don't hand-edit `vault/library/books/`; re-ingest instead.
 - Don't leave durable notes isolated: add body wikilinks and useful
@@ -364,14 +364,15 @@ going forward. Prefer `$TTRPG_5ETOOLS_DIR` in commands.
 ## Harness portability
 
 The project is one set of capabilities; each harness discovers a different
-subset. `.agents/` is canonical, `.pi/` and `.claude/` are generated adapters.
+subset. `.agents/` is canonical; `.pi/`, `.claude/`, and `.codex/config.toml`
+are generated adapters.
 
 | Capability | pi | Claude Code | Codex |
 |---|---|---|---|
 | Skills | native from `.agents/skills/` | via generated `.claude/skills/` symlinks | native from `.agents/skills/` |
 | This contract | `AGENTS.md` | `CLAUDE.md` → `@AGENTS.md` | `AGENTS.md` |
 | Slash prompts | `.pi/prompts/` | `.claude/commands/` | **none** — read `.agents/prompts/<name>.md` |
-| MCP | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers` | **none** — needs a one-time `codex mcp add` |
+| MCP | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers` | generated `.codex/config.toml` |
 | Bare `qmd …` works | yes | yes | **no** — shell functions do not cross |
 | Parallel subagents | chain runner | `.claude/workflows/*.js` | no |
 

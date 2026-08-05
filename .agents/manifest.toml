@@ -1,7 +1,8 @@
 # .agents/manifest.toml — capability declarations for the ttrpg-agent toolchain.
 #
 # This is the input to `.agents/harness sync`, which generates every harness
-# adapter under .claude/ and the derived parts of .pi/. Edit here, never there.
+# adapter under .claude/, .codex/config.toml, and the derived parts of .pi/.
+# Edit here, never there.
 #
 # Hand-authored and NOT generated: .pi/settings.json (provider/packages — pi
 # specific and not derivable), .pi/mcp.json (lifecycle overrides),
@@ -99,9 +100,13 @@ name = "foundry-vtt"
 type = "stdio"
 command = "bash"
 args = [".agents/bin/foundry-mcp"]
-# Codex has no project-scope MCP config. Registering it writes the user's global
-# config, so bootstrap only ever offers this — never does it implicitly.
-codex_register = "codex mcp add foundry-vtt -- bash {root}/.agents/bin/foundry-mcp"
+# Codex discovers this adapter only from the trusted ttrpg-agent repository.
+# Resolve the launcher from Git rather than baking one machine's absolute path
+# into a tracked project config; this also works when Codex starts in a subdir.
+codex_command = "bash"
+codex_args = ["-lc", 'exec "$(git rev-parse --show-toplevel)/.agents/bin/foundry-mcp"']
+codex_startup_timeout_sec = 60
+codex_default_tools_approval_mode = "writes"
 
 # --- vendored upstream checkouts -------------------------------------------
 # Tier L: fetched on first use, never at clone time. `.agents/harness vendor
@@ -309,5 +314,5 @@ user_owned = [".claude/settings.local.json"]
 detect = ["codex", "--version"]
 skills = "native"           # codex reads .agents/skills directly
 prompts = false             # user-scope only; no project prompts exist
-mcp = false                 # no project config of any kind
+mcp = ".codex/config.toml"  # generated; loaded only for this trusted project
 hooks = false

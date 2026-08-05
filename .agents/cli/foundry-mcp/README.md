@@ -79,7 +79,8 @@ read/write tools; use a less privileged user when only limited access is wanted.
 3. installs the pinned upstream revision under `.cache/vendor/foundry-vtt-mcp` if absent;
 4. reads `/api/status` and verifies that a world is active;
 5. resolves `FOUNDRY_MCP_USER` through Foundry's join data;
-6. atomically writes `.agents/state/foundry-credentials.json` with mode `0600`;
+6. ensures `.agents/state/foundry-credentials.json` has the exact current
+   credentials and mode `0600`, atomically rewriting it only when needed;
 7. starts the unmodified upstream MCP server with the targeted compatibility preload.
 
 The launcher constructs one internal HTTPS endpoint from the resolved host and

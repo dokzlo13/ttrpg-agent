@@ -2,11 +2,11 @@
 name: ttrpg-harness-engineering
 description: |
   Maintain this project's multi-harness toolchain: .agents/ canonical sources,
-  the environment contract, hermetic bin/ entrypoints, generated pi/Claude
+  the environment contract, hermetic bin/ entrypoints, generated pi/Claude/Codex
   adapters, the tool contract, and bootstrap/doctor/sync/verify. Use when adding
   or changing a skill, prompt, tool, MCP server, or harness adapter; when a
   harness stops discovering project resources; when caches leak outside the
-  project; or when something under .claude/ or .pi/ looks hand-edited. Operates
+  project; or when something under .claude/, .pi/, or .codex/ looks hand-edited. Operates
   on the toolchain only — never on vault/, imports/, or .cache/ data.
 ---
 
@@ -18,7 +18,7 @@ instead of drifting back into one harness's dialect.
 
 ## Scope boundary — read this first
 
-**In scope:** `.agents/**`, `.pi/**`, `.claude/**`, `.mcp.json`, `AGENTS.md`,
+**In scope:** `.agents/**`, `.pi/**`, `.claude/**`, `.codex/**`, `.mcp.json`, `AGENTS.md`,
 `CLAUDE.md`, `README.md`, `.env.example`, `.gitignore`, `pytest.ini`.
 
 **Out of scope:** `vault/`, `imports/`, `.qmd` (gone), and the *contents* of
@@ -43,7 +43,7 @@ Six layers, each with one owner:
 ```
 L5  Governance      this skill
 L4  Lifecycle       .agents/harness <bootstrap|doctor|sync|verify|vendor>
-L3  Adapters        .claude/  .pi/  (+ user-scope codex)      <- GENERATED
+L3  Adapters        .claude/  .pi/  .codex/config.toml        <- GENERATED
 L2  Contracts       env contract · tool contract · model tiers
 L1  Canonical       .agents/{skills,prompts,chains,cli,bin,env.sh,manifest.toml}
 L0  Data            vault/ imports/ .cache/                   <- NEVER TOUCHED
@@ -81,8 +81,8 @@ L0  Data            vault/ imports/ .cache/                   <- NEVER TOUCHED
    break isolation. The one escape hatch is `TTRPG_ALLOW_HOST_CACHES=1`.
 8. **No global installs, no global config.** Everything the project needs is
    project-local or is a declared Tier G prerequisite that bootstrap only
-   *checks*. The one exception is Codex MCP registration, which has no project
-   scope — so it is explicit, opt-in, and never implicit.
+   *checks*. Codex MCP registration lives in generated `.codex/config.toml` and
+   must remain absent from the user-level Codex config.
 
 ## What each harness can and cannot do
 
@@ -94,7 +94,7 @@ moves.
 | `.agents/skills/` discovery | native | needs `.claude/skills/<n>` symlinks (followed) | native |
 | `AGENTS.md` | yes | **no** — needs `CLAUDE.md` → `@AGENTS.md` | yes |
 | Project slash prompts | `.pi/prompts/` | `.claude/commands/` | **none — user scope only** |
-| Project MCP config | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers`, needs `"type": "stdio"` | **none** |
+| Project MCP config | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers`, needs `"type": "stdio"` | generated `.codex/config.toml` |
 | Project hooks | extensions | `.claude/settings.json` | **no project scope** (user-scope `~/.codex/hooks.json` exists) |
 | Env injection per command | `shellCommandPrefix` | `SessionStart` → `$CLAUDE_ENV_FILE` | parent-process inheritance only |
 | → shell *functions* propagate | yes | yes | **no** (fresh shell per command) |
@@ -197,7 +197,7 @@ a world already up, and only when asked.
 
 ## Anti-patterns
 
-- Hand-editing anything under `.claude/`, or the generated parts of `.pi/`.
+- Hand-editing anything under `.claude/`, `.codex/config.toml`, or the generated parts of `.pi/`.
 - Adding a pi model ID to a Claude command.
 - "Just this once" using a bare `qmd`/`marker_single` in a skill.
 - Making a skill depend on a harness feature only one harness has, without

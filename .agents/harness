@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { parseToml } from "./harness-lib/toml.mjs";
 import { generateAll, orphanedArtifacts, syncClaudeSkills, writePlan } from "./harness-lib/sync.mjs";
-import { registerCodexMcp, runBootstrap } from "./harness-lib/bootstrap.mjs";
+import { runBootstrap } from "./harness-lib/bootstrap.mjs";
 import { runVerify } from "./harness-lib/verify.mjs";
 import { vendorStatus, vendorSync, vendorUpdate } from "./harness-lib/vendor.mjs";
 
@@ -150,8 +150,6 @@ function usage() {
       "  doctor                        alias for `bootstrap --check`",
       "  sync                          regenerate every harness adapter",
       "  verify                        structural checks, drift diff, env smoke tests",
-      "  codex-mcp register [name]     add the MCP server to your GLOBAL Codex config",
-      "  codex-mcp remove [name]       undo that",
       "  vendor status                 pinned ref vs actual checkout, per vendor",
       "  vendor sync <name>            clone/fetch/checkout the pin, then build",
       "  vendor update <name> <ref>    move the pin (explicit; never automatic)",
@@ -189,27 +187,6 @@ switch (command) {
   case "verify": {
     const n = runVerify(ROOT, manifest, report);
     process.exit(n ? 1 : 0);
-  }
-
-  case "codex-mcp": {
-    // Explicit and user-initiated. Codex has no project scope, so the only way
-    // to give it an MCP server is to write the user's global config — which is
-    // why bootstrap only ever *reports* this and never does it.
-    const [sub, name] = rest;
-    try {
-      const target = name ?? (manifest.mcp ?? [])[0]?.name;
-      if (!target) throw new Error("no [[mcp]] entries in the manifest");
-      if (sub === "register" || sub === undefined) {
-        registerCodexMcp(ROOT, manifest, target, report);
-      } else if (sub === "remove") {
-        registerCodexMcp(ROOT, manifest, target, report, { remove: true });
-      } else {
-        throw new Error(`unknown codex-mcp subcommand: ${sub} (expected register|remove)`);
-      }
-    } catch (error) {
-      report.row("FAIL", "codex-mcp", error.message);
-    }
-    process.exit(report.failed() ? 1 : 0);
   }
 
   case "vendor": {

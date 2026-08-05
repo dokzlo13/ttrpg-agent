@@ -50,6 +50,7 @@ ttrpg-agent/
 ├── AGENTS.md                  # the project contract (all harnesses)
 ├── CLAUDE.md                  # generated: @-imports AGENTS.md for Claude Code
 ├── .mcp.json                  # generated: shared MCP server registration
+├── .codex/config.toml         # generated: project-scoped Codex MCP registration
 ├── .env.example               # non-secret config template
 ├── .agents/                   # ← CANONICAL. The only place a human edits.
 │   ├── README.md              # technical map of the toolchain
@@ -295,7 +296,7 @@ gap has a stated workaround.
 | Skills from `.agents/skills/` | native | via generated `.claude/skills/` symlinks | native |
 | Project contract | `AGENTS.md` | generated `CLAUDE.md` → `@AGENTS.md` | `AGENTS.md` |
 | Slash prompts | `.pi/prompts/` | `.claude/commands/` | ❌ user scope only |
-| Project MCP config | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers` | ❌ none |
+| Project MCP config | `.mcp.json` + `.pi/mcp.json` | `.mcp.json` + `enabledMcpjsonServers` | generated `.codex/config.toml` |
 | Project hooks | extensions | `.claude/settings.json` | ❌ no project scope (user-scope `~/.codex/hooks.json` exists) |
 | Bare `qmd …` in a tool shell | ✅ | ✅ | ❌ functions don't cross |
 | Tools via `.agents/bin/*` | ✅ | ✅ | ✅ |
@@ -306,17 +307,10 @@ gap has a stated workaround.
 
 - **Codex has no project prompts.** Name the workflow instead, or read
   `.agents/prompts/<name>.md` directly.
-- **Codex has no project MCP config.** Register the Foundry server once,
-  globally — it writes your user config, so it is never done implicitly:
-
-  ```bash
-  .agents/harness codex-mcp register foundry-vtt   # undo: ... codex-mcp remove foundry-vtt
-  ```
-
-  Then **restart Codex** — it attaches MCP servers only at session start.
-  `.agents/harness doctor` reports whether this is done. If a Codex session
-  says it has no Foundry tools, this is almost always why: the tool namespace
-  does not exist at all, so nothing inside the session can hint at it.
+- **Codex loads Foundry from generated `.codex/config.toml`.** Run Codex from
+  this trusted repository and restart the session after configuration changes.
+  `.agents/harness doctor` verifies both project discovery and that no copy has
+  leaked into the user-level Codex config.
 
 - **Codex gets no shell functions**, only inherited environment variables (via
   the `.agents/bin/codex` launcher). A bare `qmd` will not work there. Use
@@ -426,7 +420,7 @@ Tracked by git:
   `harness-lib/`, `bin/`, `cli/` source + tests + lockfiles + READMEs, `skills/`,
   `conditional-skills/`, `prompts/`, `chains/`, `scripts/`
 - Generated adapters, tracked so a clone works before the first `sync`:
-  `CLAUDE.md`, `.mcp.json`, `.claude/commands/`, `.claude/settings.json`,
+  `CLAUDE.md`, `.mcp.json`, `.codex/config.toml`, `.claude/commands/`, `.claude/settings.json`,
   `.claude/skills/` symlinks, `.claude/workflows/`, `.pi/prompts/`,
   `.pi/agents/`, `.pi/chains/`
 - Hand-authored harness config: `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`
@@ -642,7 +636,7 @@ It never decides meaning or destination. The LLM chooses placement, then edits t
 
 The project supports three separate Foundry workflows:
 
-1. **Live MCP world access** — `.mcp.json` and `.pi/mcp.json` launch `.agents/bin/foundry-mcp`, which connects as a dedicated Foundry user. See [`.agents/cli/foundry-mcp/README.md`](.agents/cli/foundry-mcp/README.md). Run `.agents/cli/foundry-mcp/smoke-test.sh` for an end-to-end read-only validation.
+1. **Live MCP world access** — `.mcp.json`, `.pi/mcp.json`, and `.codex/config.toml` launch `.agents/bin/foundry-mcp`, which connects as a dedicated Foundry user. See [`.agents/cli/foundry-mcp/README.md`](.agents/cli/foundry-mcp/README.md). Run `.agents/cli/foundry-mcp/smoke-test.sh` for an end-to-end read-only validation.
 2. **Importer statblock** — plain WotC-style prose for the 5e Statblock Importer. No Foundry enrichers inside the import block.
 3. **Post-import prose** — Foundry dnd5e enrichers for actor/item/journal descriptions, clickable saves/checks/damage, references, and notes.
 

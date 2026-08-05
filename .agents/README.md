@@ -1,8 +1,9 @@
 # `.agents/` — the canonical toolchain
 
-Everything a session needs, expressed once, harness-neutrally. `.pi/` and
-`.claude/` are **adapters generated from here**; Codex reads `.agents/skills/`
-natively and gets the rest through a launcher.
+Everything a session needs, expressed once, harness-neutrally. `.pi/`,
+`.claude/`, and `.codex/config.toml` are **adapters generated from here**. Codex
+reads `.agents/skills/` natively and gets the environment contract through a
+launcher.
 
 If you are changing anything in this directory, read the
 `ttrpg-harness-engineering` skill first — it holds the invariants and the
@@ -174,7 +175,6 @@ runs it out of that venv.
 .agents/harness bootstrap --apply       # install harness deps + per-tool envs
 .agents/harness sync                    # regenerate every adapter; idempotent
 .agents/harness verify                  # asserts + regenerate-and-diff + smoke
-.agents/harness codex-mcp register foundry-vtt   # Codex only; writes GLOBAL config
 .agents/harness vendor status
 .agents/harness vendor sync 5etools
 .agents/harness vendor update 5etools v2.29.0
@@ -204,7 +204,7 @@ regenerates them into memory and diffs:
 | `.claude/workflows/*.js` | `.agents/chains/*/spec.json` |
 | `.pi/prompts/*.md` | canonical body **concatenated** + pi frontmatter |
 | `.pi/chains/*.json`, `.pi/agents/creative-*.md` | same chain spec |
-| `.mcp.json`, `CLAUDE.md` | manifest |
+| `.mcp.json`, `.codex/config.toml`, `CLAUDE.md` | manifest |
 
 Hand-authored and staying that way: `.pi/settings.json`, `.pi/mcp.json`,
 `.pi/extensions/*`, and `.claude/settings.local.json` (user-owned; the generator
@@ -247,7 +247,7 @@ value would break isolation silently). Escape hatch:
 | `.agents/skills/` | native | via generated symlinks | native |
 | `AGENTS.md` | yes | needs `CLAUDE.md` → `@AGENTS.md` | yes |
 | project slash prompts | yes | yes | **none — user scope only** |
-| project MCP | yes | yes (needs `"type": "stdio"`) | **none — `codex mcp add`** |
+| project MCP | yes | yes (needs `"type": "stdio"`) | generated `.codex/config.toml` |
 | shell functions cross into tools | yes | yes | **no** |
 
 So a bare `qmd` works under pi and Claude but not Codex — which is exactly why

@@ -222,61 +222,37 @@ function detectHarnesses(manifest, report) {
   return found;
 }
 
-// Is this server already in the user's global Codex config?
-export function codexMcpRegistered(name) {
-  return run("codex", ["mcp", "get", name]).ok;
-}
-
-// Explicit, user-initiated registration. Never called by bootstrap itself:
-// this writes the user's GLOBAL Codex config, which is not ours to change.
-export function registerCodexMcp(root, manifest, name, report, { remove = false } = {}) {
-  const entry = (manifest.mcp ?? []).find((m) => m.name === name);
-  if (!entry) throw new Error(`no [[mcp]] entry named "${name}" in the manifest`);
-
-  report.section(`codex-mcp ${remove ? "remove" : "register"} ${name}`);
-  if (remove) {
-    const res = run("codex", ["mcp", "remove", name]);
-    report.row(res.ok ? PASS : FAIL, name, res.ok ? "removed from global Codex config" : res.out.split("\n")[0]);
-    return;
-  }
-
-  if (codexMcpRegistered(name)) {
-    report.row(PASS, name, "already registered");
-    return;
-  }
-  // Absolute path: Codex resolves the command against its own cwd, not ours.
-  const args = ["mcp", "add", name, "--", entry.command, ...entry.args.map((a) => path.join(root, a))];
-  const res = run("codex", args);
-  if (!res.ok) {
-    report.row(FAIL, name, res.out.split("\n")[0]);
-    return;
-  }
-  report.row(PASS, name, `registered globally: ${entry.command} ${path.join(root, entry.args[0])}`);
-  report.row(
-    SKIP,
-    name,
-    "Codex attaches MCP servers at session start — restart Codex to see the tools",
-    `undo with: codex mcp remove ${name}`,
-  );
+// Query outside every project so only user-level Codex configuration applies.
+function codexMcpRegisteredGlobally(name) {
+  return run("codex", ["mcp", "get", name], { cwd: path.parse(process.cwd()).root }).ok;
 }
 
 function reportCodexMcp(root, manifest, report, detected) {
   if (!detected.includes("codex")) return;
-  report.section("Codex MCP (global config — never written implicitly)");
+  report.section("Codex MCP (project-scoped)");
+  const configPath = path.join(root, ".codex/config.toml");
   for (const m of manifest.mcp ?? []) {
-    if (!m.codex_register) continue;
-    // Report actual state. Previously this always said SKIP, so a user who had
-    // already registered got the same "not done" row forever, and one who had
-    // not could read SKIP as "nothing to do here".
-    if (codexMcpRegistered(m.name)) {
-      report.row(PASS, m.name, "registered in your global Codex config");
+    if (codexMcpRegisteredGlobally(m.name)) {
+      report.row(
+        FAIL,
+        `${m.name} global isolation`,
+        "still present in the user-level Codex config",
+        `run from outside this repo: codex mcp remove ${m.name}`,
+      );
+    } else {
+      report.row(PASS, `${m.name} global isolation`, "absent outside this project");
+    }
+
+    if (!fs.existsSync(configPath)) {
+      report.row(FAIL, m.name, "missing .codex/config.toml", ".agents/harness sync");
       continue;
     }
+    const project = run("codex", ["mcp", "get", m.name], { cwd: root });
     report.row(
-      SKIP,
+      project.ok ? PASS : FAIL,
       m.name,
-      "not registered — Codex has no project-scope MCP config, so this is opt-in",
-      `.agents/harness codex-mcp register ${m.name}   (or: ${m.codex_register.replace("{root}", root)})`,
+      project.ok ? "available from .codex/config.toml" : "not discovered from the project config",
+      project.ok ? "" : ".agents/harness sync, then trust/restart Codex in this repository",
     );
   }
 }

@@ -221,6 +221,29 @@ export function genMcpJson(root, manifest) {
   record(".mcp.json", JSON.stringify(doc, null, 2) + "\n");
 }
 
+// Codex has its own TOML adapter. Keep it generated from the same manifest as
+// .mcp.json so the server name and hermetic launcher cannot drift.
+export function genCodexConfig(root, manifest) {
+  const lines = [shBanner(".agents/manifest.toml").trimEnd(), ""];
+  for (const m of manifest.mcp ?? []) {
+    lines.push(
+      `[mcp_servers.${m.name}]`,
+      `command = ${JSON.stringify(m.codex_command ?? m.command)}`,
+      `args = ${JSON.stringify(m.codex_args ?? m.args)}`,
+    );
+    if (m.codex_startup_timeout_sec !== undefined) {
+      lines.push(`startup_timeout_sec = ${Number(m.codex_startup_timeout_sec)}`);
+    }
+    if (m.codex_default_tools_approval_mode) {
+      lines.push(
+        `default_tools_approval_mode = ${JSON.stringify(m.codex_default_tools_approval_mode)}`,
+      );
+    }
+    lines.push("");
+  }
+  record(".codex/config.toml", lines.join("\n"));
+}
+
 // ---------------------------------------------------------------------------
 // Claude settings
 
@@ -498,6 +521,7 @@ export function generateAll(root, manifest) {
   genPiPrompts(root, manifest);
   genClaudeCommands(root, manifest);
   genMcpJson(root, manifest);
+  genCodexConfig(root, manifest);
   genClaudeSettings(root, manifest);
   genClaudeMd(root, manifest);
   genChain(root, manifest);
