@@ -56,6 +56,25 @@ dir = ".agents/cli/vault-sync"
 bin = ["vault-sync"]
 
 [[tool]]
+name = "craig-stt"
+runtime = "python"
+dir = ".agents/cli/craig-stt"
+bin = ["craig-stt"]
+# Dependency-only project: no source, just a locked pin of the upstream CLI.
+# `install = false` because the CUDA extras (nvidia-cublas + cudnn on top of
+# faster-whisper/ctranslate2) are ~2 GB — a fresh clone must not pay that at
+# bootstrap. uv builds .venv on the first `.agents/bin/craig-stt` run. The pin
+# is a git SHA shared with session-ingest's craig-stt-dataset dependency;
+# bump both in one change set.
+install = false
+
+[[tool]]
+name = "session-ingest"
+runtime = "python"
+dir = ".agents/cli/session-ingest"
+bin = ["session-ingest"]
+
+[[tool]]
 name = "vault-frontmatter"
 runtime = "node"
 dir = ".agents/cli/vault-frontmatter"
@@ -148,7 +167,7 @@ effort = "high"
 
 [[prompt]]
 name = "cleanup"
-description = "Destructive cleanup/reset for vault, imports, ingested books, and qmd indexes."
+description = "Destructive cleanup/reset for vault, imports, ingested books, qmd indexes, and the session corpus."
 argument_hint = "[scope or paths]"
 tier = "fast"
 effort = "medium"
@@ -279,6 +298,18 @@ name = "surya/datalab models"
 size = "~3.3 GB"
 path = ".cache/xdg/datalab"
 trigger = "first Marker run via `.agents/bin/book-ingest` or `.agents/bin/marker-single`"
+
+[[lazy]]
+name = "craig-stt runtime venv"
+size = "~2 GB"
+path = ".agents/cli/craig-stt/.venv"
+trigger = "first `.agents/bin/craig-stt` run"
+
+[[lazy]]
+name = "whisper large-v3 checkpoint"
+size = "~3 GB"
+path = ".cache/craig-stt/models"
+trigger = "first `.agents/bin/craig-stt transcribe` or `setup`"
 
 [[lazy]]
 name = "5etools mirror"

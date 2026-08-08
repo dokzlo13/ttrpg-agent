@@ -18,7 +18,7 @@ accretion; it is the smallest set that works:
 |---|---|---|
 | **bash** | `env.sh`, `bin/*`, `scripts/*` | The environment contract must be *sourced into* a harness's shell, and a shell function (`qmd()`) is the only thing that can wrap a command transparently. Nothing else can do this. |
 | **Node** | `harness`, `harness-lib/*`, three CLI tools | The generator must emit JS workflow files containing prose full of `{braces}` — a quoting minefield in bash. The agent-facing JS tools were already Node (pi extensions are TypeScript). |
-| **Python** | `cli/book-ingest`, `cli/vault-sync` | Marker/surya/torch are Python. `vault-sync` is Python because it sits next to them in the same problem domain. |
+| **Python** | `cli/book-ingest`, `cli/vault-sync`, `cli/craig-stt`, `cli/session-ingest` | Marker/surya/torch are Python. `vault-sync` is Python because it sits next to them in the same problem domain. `craig-stt` pins a Python upstream (faster-whisper); `session-ingest` reads its datasets through that upstream's SDK. |
 
 The language is an implementation detail of each tool. Callers only ever touch
 `bin/<tool>`, which is uniformly bash regardless of what it execs.
@@ -43,11 +43,13 @@ The language is an implementation detail of each tool. Callers only ever touch
 │   ├── _lib/spec-args.mjs    shared argv parser built from a tool's spec
 │   ├── book-ingest/          python  (marker + torch + CUDA live in ITS venv)
 │   ├── vault-sync/           python
+│   ├── craig-stt/            python  (deps only, no source — pins the upstream GPU transcriber)
+│   ├── session-ingest/       python  (post-processing; portable, no CUDA)
 │   ├── query-5etools/        node
 │   ├── vault-frontmatter/    node    (owns its own `yaml` dep + lockfile)
 │   ├── image-gen/            node
 │   └── foundry-mcp/          bash + node launcher for a vendored MCP server
-├── skills/                 24 skills — discovered natively by pi and Codex
+├── skills/                 25 skills — discovered natively by pi and Codex
 ├── conditional-skills/     ttrpg-wsl-sync, surfaced only when configured
 ├── prompts/                9 canonical bodies, NO frontmatter, + _partials/
 ├── chains/                 multi-agent workflow specs
@@ -198,7 +200,7 @@ regenerates them into memory and diffs:
 
 | Output | From |
 |---|---|
-| `.claude/skills/<n>` (24 symlinks) | `.agents/skills/` scan |
+| `.claude/skills/<n>` (25 symlinks) | `.agents/skills/` scan |
 | `.claude/commands/*.md` | canonical prompt body + manifest |
 | `.claude/settings.json` | manifest (env hook, MCP allowlist, permissions) |
 | `.claude/workflows/*.js` | `.agents/chains/*/spec.json` |

@@ -1,10 +1,11 @@
 ---
 name: ttrpg-library-search
 description: |
-  Hybrid qmd search across ingested books, active vault notes, and optional
-  legacy archive prose. Use for "find/remember/where is this discussed" tasks
-  whose answer is a passage, scene, lore note, or campaign note. For canonical
-  creature/spell/item/class mechanics, query 5etools first.
+  Hybrid qmd search across ingested books, active vault notes, optional legacy
+  archive prose, and — only on explicit request — rendered session transcripts.
+  Use for "find/remember/where is this discussed" tasks whose answer is a
+  passage, scene, lore note, campaign note, or something said at the table. For
+  canonical creature/spell/item/class mechanics, query 5etools first.
 ---
 
 # ttrpg-library-search
@@ -23,15 +24,42 @@ or note rather than a structured record. Examples:
 "every CR 5–7 fey in MM", "all 3rd-level evocation spells", "rare weapons".
 Use `ttrpg-rules-5etools-native` for class/subclass/feat/background records. qmd is bad at structured filtering.
 
-## Three collections, one tool
+## Four collections, one tool
 
 | Collection | What's in it | When to query |
 |---|---|---|
 | `books` | Ingested PDFs under `vault/library/books/` | "find … in my books" |
 | `notes` | Active authored notes under `vault/notes/` | "did I already write …" |
 | `archive` | Optional read-only legacy vault under `imports/source-vault/` | only when user explicitly asks for old notes |
+| `transcripts` | Rendered session transcripts under `vault/transcripts/` | only when the user explicitly wants what was *said at the table* |
 
 Default: query `books` first for book/library questions, and `notes` for campaign-note questions. If you need more than one collection, repeat `-c`; **do not comma-join collection names**. Add `archive` only on explicit ask.
+
+### `transcripts` — what was SAID, not what is TRUE
+
+`transcripts` is **excluded from default search** and must be requested by name
+(`-c transcripts`). That exclusion is deliberate: prep and lore retrieval must
+never be polluted with hours of verbatim table speech, most of which is jokes,
+rules arguments, and out-of-character chatter.
+
+- `notes` answers **"what is true in the campaign"** — reviewed, authored canon.
+- `transcripts` answers **"what was said at the table"** — verbatim speech, with
+  a timestamp and a speaker, adjudicating nothing.
+
+When the two disagree, that is a **contradiction finding for the owner**:
+surface both, cite each, and let them decide. Never silently prefer the
+transcript over canon, and never silently prefer canon over a recording.
+
+```bash
+# Explicit, and only when the question is about table speech
+.agents/bin/qmd search "некромантия Вазгар" -c transcripts
+.agents/bin/qmd get <doc-id>
+```
+
+Quote as `[hh:mm:ss] **Speaker**: …`. If the question already gives a speaker or
+a time window, `.agents/bin/session-ingest grep` is cheaper and exact — see
+`ttrpg-session-ingest`. Never `cat`/Read a rendered chunk and never paste one
+into the response: a single chunk is ~15 minutes of speech.
 
 ## Optional frontmatter scout
 
@@ -139,3 +167,5 @@ or full rebuilds, read `ttrpg-system-qmd-maintenance`.
   and offer to pull more if needed.
 - Don't claim something "isn't in the books" without trying both `query` and
   `search`. They surface different things.
+- Don't add `-c transcripts` to a prep or lore search, and don't quote table
+  speech as campaign fact. It is excluded from default search on purpose.

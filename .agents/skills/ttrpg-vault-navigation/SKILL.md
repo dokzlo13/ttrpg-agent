@@ -2,9 +2,10 @@
 name: ttrpg-vault-navigation
 description: |
   Core workspace map for reading and writing in this TTRPG project: active
-  notes, ingested book artifacts, imports, qmd collections, and source/data
-  boundaries. Use before any task that reads from or writes to vault/, imports/,
-  vault/library/books/, or qmd-backed collections. This is navigation only;
+  notes, ingested book artifacts, imports, session transcripts, qmd collections,
+  and source/data boundaries. Use before any task that reads from or writes to
+  vault/, imports/, vault/library/books/, vault/transcripts/, or qmd-backed
+  collections. This is navigation only;
   compose with ttrpg-vault-authoring for durable note placement/writes.
 ---
 
@@ -20,6 +21,8 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 |---|---:|---:|---|
 | `vault/notes/` | yes | yes | Active authored campaign notes, prep, canvases, images. Use `ttrpg-vault-authoring` before durable writes. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. Don't hand-edit chapters. |
+| `vault/transcripts/` | via qmd/grep | only via `session-ingest render` | Rendered session transcripts. Machine-generated and regenerable; never `cat`/Read a chunk. The two `_*.yaml` files are the hand-maintained exception. |
+| `.cache/sessions/` | no | tooling only | Transcription corpus: `datasets/` is craig-stt's (SDK-only, holds the irreplaceable source recording), `<session-id>/` holds session-ingest's derived artifacts. Never open these files directly. |
 | `imports/books/` | list/read input paths | no | Raw user PDFs/EPUBs. Ingest via `ttrpg-import-book-pdf`. |
 | `imports/source-vault/` | yes | **no** | Legacy archive; promote via `ttrpg-import-archive-vault`. |
 | `imports/fvtt-data/` | yes | yes | Local staging for targeted Foundry VTT exports; preserve raw JSON/TXT/ZIP unless the user asks to clean it. |
@@ -28,7 +31,8 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 | `.agents/` | yes | it *is* the project | Canonical toolchain: `env.sh`, `bin/`, `cli/`, `skills/`, `prompts/`. `.agents/state/` is durable gitignored state and never a cleanup target. |
 
 Never edit `imports/source-vault/`, raw books, 5etools data, or hand-edit
-`vault/library/books/` chapter output.
+`vault/library/books/` chapter output or `vault/transcripts/<session-id>/`
+rendered chunks.
 
 ## Ingested book artifacts
 
@@ -73,11 +77,49 @@ Image descriptions are callouts:
 
 They are AI-generated retrieval aids. Do not quote them as book prose.
 
+## Session transcripts and the recording corpus
+
+A recorded session lands in two roots, split by replaceability. Both are owned
+by `.agents/bin/session-ingest`; see `ttrpg-session-ingest` for the pipeline.
+
+```text
+vault/transcripts/                # small, Obsidian-visible, qmd-indexed
+├── _speakers.yaml                # hand-maintained: discord user_id → player/character/role
+├── _lexicon.yaml                 # hand-maintained: variant → canonical corrections
+└── <session-id>/
+    ├── __<session-id>.md         # overview: participants, stats, chunk TOC, QA summary
+    └── NN-mmm-mmm.md             # chunks: [hh:mm:ss] **Speaker**: text ^t<turn-id>
+
+.cache/sessions/                  # gigabytes; never opened directly
+├── datasets/<recording_id>/      # craig-stt's; source/ is IRREPLACEABLE, SDK-only access
+├── scratch/                      # A/B re-transcription work dirs (disposable)
+└── <session-id>/                 # derived: anchors.json, extraction.json, record.json, recap.draft.md
+```
+
+Read order and access rules:
+
+1. **Search, don't read.** `.agents/bin/qmd search/query -c transcripts` for a
+   topic, `.agents/bin/session-ingest grep` for a known speaker/time window.
+   Always `.agents/bin/qmd get <doc-id>` before quoting; never `cat`/Read a
+   whole chunk — they are tens of thousands of words of table speech.
+2. **Cite as** `vault/transcripts/<session-id>/<NN-…>.md` with the `hh:mm:ss`
+   and speaker, or follow a `[[transcripts/<id>/NN-…#^t…]]` block link.
+3. **A transcript quote is what was SAID, not what is TRUE.** Campaign truth
+   lives in `vault/notes/`; a disagreement between them is a finding for the
+   owner, not something to resolve silently.
+4. **Writes:** `vault/transcripts/<id>/` only via `session-ingest render`;
+   everything under `.cache/sessions/` only via the CLI and the SDK. The two
+   `_*.yaml` files are hand-editable user data and cleanup-protected.
+
 ## qmd collection map
 
 - `books` → `vault/library/books/**/*.md` (book overviews + chapters).
 - `notes` → `vault/notes/**/*.md` (active authored notes).
 - `archive` → legacy vault material; use only when explicitly requested.
+- `transcripts` → `vault/transcripts/**/*.md` (rendered session transcripts).
+  **Excluded from default search** — prep retrieval must never surface table
+  speech, so request it explicitly with `-c transcripts`. The `**/*.md` mask
+  deliberately misses `_speakers.yaml` / `_lexicon.yaml`, which stay unindexed.
 
 Use `.agents/bin/qmd search/query/get` for prose retrieval; use `query_5etools` first for
 canonical creature/spell/item filters.
@@ -102,5 +144,7 @@ absent.
 - New active note/canvas/handout? Use `ttrpg-vault-authoring`, then optionally
   rich-note/canvas skills.
 - New or changed ingested book? Use `ttrpg-import-book-pdf` / `book-ingest`.
+- New session recording, transcript, or recap? Use `ttrpg-session-ingest`; the
+  resulting session note still goes through `ttrpg-vault-authoring`.
 - Promoting old-vault content? Use `ttrpg-import-archive-vault`.
 - Search/index stale? Use `ttrpg-system-qmd-maintenance`.

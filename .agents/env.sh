@@ -141,6 +141,36 @@ else
   export npm_config_cache="$TTRPG_CACHE_DIR/npm"
 fi
 
+# --- session corpus: recordings, datasets, rendered transcripts --------------
+# A new user-generated data class, split by how replaceable each part is:
+#
+#   .cache/sessions/datasets/<recording_id>/   craig-stt's work dir. Holds the
+#                                              IRREPLACEABLE source archive
+#                                              (Craig expires recordings) next to
+#                                              ~2 GB of regenerable pcm/ and stt/.
+#   .cache/sessions/<session-id>/              session-ingest's derived artifacts
+#   .cache/sessions/scratch/                   A/B re-transcription work dirs
+#   .cache/craig-stt/                          whisper checkpoints (~3 GB)
+#   vault/transcripts/                         rendered markdown — small,
+#                                              Obsidian-visible, qmd-indexed
+#
+# Keeping the gigabytes under .cache/ is what lets the Windows mirror stay cheap:
+# the wsl-sync script never crosses .cache/, so only the rendered transcripts and
+# the two hand-maintained _*.yaml files reach it.
+export TTRPG_SESSIONS_DIR="$TTRPG_CACHE_DIR/sessions"
+export TTRPG_SESSION_DATASETS_DIR="$TTRPG_SESSIONS_DIR/datasets"
+export TTRPG_TRANSCRIPTS_DIR="$TTRPG_VAULT_DIR/transcripts"
+# craig-stt takes its whole configuration from CRAIG_STT_* environment keys, and
+# these two are the ones that decide *where gigabytes land*. They are therefore
+# contract-owned exactly like the cache vars above: set unconditionally, and set
+# after the .env parse, so a value in .env has no effect. That is deliberate — a
+# stray .env entry must not be able to scatter a 3 GB model store outside the
+# project or move an irreplaceable recording somewhere cleanup does not protect.
+# Every other CRAIG_STT_* key (base URL, ignore lists, STT model/language) is
+# genuine user config and does come from .env; see .env.example.
+export CRAIG_STT_WORK_DIR="$TTRPG_SESSION_DATASETS_DIR"
+export CRAIG_STT_CACHE_DIR="$TTRPG_CACHE_DIR/craig-stt"
+
 # --- vendored upstream checkouts (see .agents/manifest.toml [[vendor]]) ------
 # 5etools is a pinned git clone, not user content: re-clonable, read-only by
 # policy. It lives under the vendor root, and everything reaches it through
@@ -200,6 +230,9 @@ mkdir -p \
   "$HF_HOME" \
   "$TORCH_HOME" \
   "$npm_config_cache" \
+  "$TTRPG_SESSIONS_DIR" \
+  "$TTRPG_SESSION_DATASETS_DIR" \
+  "$CRAIG_STT_CACHE_DIR" \
   "$TTRPG_STATE_DIR" \
   "$TTRPG_IMPORTS_DIR/fvtt-data" \
   "$TTRPG_BOOKS_DIR" \
@@ -208,6 +241,7 @@ mkdir -p \
   "$TTRPG_NOTES_DIR/images" \
   "$PROJECT_ROOT/vault/notes/mechanics" \
   "$PROJECT_ROOT/vault/notes/readalouds" \
+  "$TTRPG_TRANSCRIPTS_DIR" \
   "$TTRPG_LIBRARY_DIR" \
   2>/dev/null
 
@@ -324,12 +358,19 @@ _ttrpg_qmd_ensure_config() {
   _ttrpg_qmd_ensure_collection notes "$TTRPG_NOTES_DIR" "**/*.md"
   _ttrpg_qmd_ensure_collection books "$TTRPG_LIBRARY_DIR" "**/*.md"
   _ttrpg_qmd_ensure_collection archive "$TTRPG_SOURCE_VAULT_DIR" "**/*.md"
+  # Rendered session transcripts. The `**/*.md` mask deliberately does not match
+  # vault/transcripts/_speakers.yaml or _lexicon.yaml, so the two hand-maintained
+  # files stay out of the index. Excluded from default search: prep retrieval
+  # must never surface verbatim table speech alongside campaign canon.
+  _ttrpg_qmd_ensure_collection transcripts "$TTRPG_TRANSCRIPTS_DIR" "**/*.md"
 
   _ttrpg_qmd_exec collection exclude archive >/dev/null 2>&1 || true
+  _ttrpg_qmd_exec collection exclude transcripts >/dev/null 2>&1 || true
 
   _ttrpg_qmd_exec context add qmd://notes "Active campaign notes and table prep under vault/notes." >/dev/null 2>&1 || true
   _ttrpg_qmd_exec context add qmd://books "Ingested RPG books and supplements under vault/library/books." >/dev/null 2>&1 || true
   _ttrpg_qmd_exec context add qmd://archive "Optional legacy notes under imports/source-vault; search only when explicitly requested." >/dev/null 2>&1 || true
+  _ttrpg_qmd_exec context add qmd://transcripts "Rendered session transcripts under vault/transcripts; verbatim table speech, not campaign canon. Search only when explicitly asked." >/dev/null 2>&1 || true
 }
 
 _ttrpg_qmd_ensure_index_if_missing() {
@@ -422,7 +463,10 @@ if [ "${TTRPG_ENV_DUMP:-0}" = "1" ]; then
   _ttrpg_dump_keys="TTRPG_ROOT TTRPG_AGENTS_DIR TTRPG_BIN_DIR TTRPG_BIN_REAL
 TTRPG_CLI_DIR TTRPG_TOOLS_DIR TTRPG_STATE_DIR TTRPG_IMPORTS_DIR TTRPG_BOOKS_DIR
 TTRPG_SOURCE_VAULT_DIR TTRPG_VAULT_DIR TTRPG_NOTES_DIR TTRPG_LIBRARY_DIR
+TTRPG_TRANSCRIPTS_DIR
 TTRPG_CACHE_DIR TTRPG_VENDOR_DIR TTRPG_5ETOOLS_DIR TTRPG_QMD_BIN
+TTRPG_SESSIONS_DIR TTRPG_SESSION_DATASETS_DIR
+CRAIG_STT_WORK_DIR CRAIG_STT_CACHE_DIR
 QMD_CONFIG_DIR XDG_CACHE_HOME UV_CACHE_DIR HF_HOME TORCH_HOME npm_config_cache
 FOUNDRY_MCP_UPSTREAM_DIR FOUNDRY_CREDENTIALS
 CUDA_HOME CUDAToolkit_ROOT CUDACXX GGML_CUDA_NO_VMM QMD_LLAMA_GPU PATH"

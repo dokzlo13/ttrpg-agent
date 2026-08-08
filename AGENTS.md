@@ -43,7 +43,7 @@ Use **`ttrpg-vault-navigation`** before any task that reads from or writes to
 single source for:
 
 - active notes vs ingested book artifacts vs raw imports;
-- qmd collection mapping (`books`, `notes`, `archive`);
+- qmd collection mapping (`books`, `notes`, `archive`, `transcripts`);
 - current book-ingest layout;
 - what may be written directly and what must go through a tool.
 
@@ -60,11 +60,13 @@ skills when creating durable active-vault content.
 | `.pi/`, `.claude/`, `.codex/` | yes | **mostly generated** | Harness adapters. Emitted by `.agents/harness sync` — do not hand-edit. Hand-authored exceptions: `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `.claude/settings.local.json`. |
 | `.cache/` | no | tooling only | Single cache root. Rebuildable: `xdg/qmd/index.sqlite*`, `index/index.yml`. **Must survive cleanup:** `xdg/qmd/models/` and `xdg/datalab/` (~5.5 GB), `huggingface/`, `torch/`, `uv/`, `npm/`, `vendor/`. |
 | `.cache/vendor/5etools/` | yes | no | Canonical 5e data mirror — a pinned vendor checkout, reached via `$TTRPG_5ETOOLS_DIR`. |
+| `.cache/sessions/` | no | tooling only | Transcription corpus: `datasets/` (craig-stt's, SDK-only) plus per-session derived artifacts. `datasets/*/source/` is the original Craig archive and is **irreplaceable** — Craig expires recordings. Reclaim space only with `session-ingest prune`, never `rm`. |
 | `imports/books/` | file list/input only | no | Raw books supplied by the user. |
 | `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
 | `imports/fvtt-data/` | yes | **yes** | The one writable exception under `imports/`: local staging for targeted Foundry VTT exports. |
 | `vault/notes/` | yes | yes | Active authored campaign notes and table prep. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. |
+| `vault/transcripts/` | via qmd / `session-ingest grep` | only via `session-ingest render` | Rendered session transcripts: machine-owned and regenerable. `_speakers.yaml` and `_lexicon.yaml` are the hand-maintained exception. |
 
 ### Ingested book layout
 
@@ -142,6 +144,9 @@ Collection defaults:
 - `books` → `vault/library/books/**/*.md`.
 - `notes` → `vault/notes/**/*.md`.
 - `archive` → legacy vault; use only when explicitly requested.
+- `transcripts` → `vault/transcripts/**/*.md`; **excluded from default search**,
+  request it by name. It answers "what was said at the table", never "what is
+  true in the campaign" — a disagreement with `notes` is a finding for the owner.
 
 Always `qmd get <doc-id>` before quoting or summarizing a search hit.
 `vault_frontmatter` reads only YAML frontmatter plus optional short previews; do
@@ -192,7 +197,26 @@ don't invent omitted steps. With `OPENAI_API_KEY` present, every metered
 follow-on plus `qmd update && qmd embed` is emitted; without a key, only the
 qmd refresh is. See `ttrpg-import-book-pdf` for details.
 
-### 5. Foundry VTT tooling
+### 5. Session capture and recap
+
+A recorded session is its own ingest path: the CLI produces the transcript and a
+structured record, and the agent authors the note.
+
+| Task trigger | Use |
+|---|---|
+| Craig share URL pasted; "process/transcribe the session recording" | `ttrpg-session-ingest` |
+| "Session recap", «что было на сессии», "what happened last session" | `ttrpg-session-ingest`, then `ttrpg-vault-authoring` for the durable note |
+| Wrong names/terms in a transcript; re-transcription request | `ttrpg-session-ingest` (the `qa` → `glossary` → re-run loop) |
+| "What did X actually say about Y?" | `ttrpg-session-ingest`: `session-ingest grep` for a known speaker/window, otherwise `qmd … -c transcripts` |
+
+As with book-ingest, the CLI's `--json` `next_steps` is the ordering authority
+and metered stages are omitted without `OPENAI_API_KEY` — don't invent them. The
+CLI never writes `vault/notes/`: the agent authors the session note from
+`recap.draft.md` + `record.json`. A transcript quote is evidence of what was
+*said*, not of what is *true*, and anything flagged `world_impact != none` or
+`needs_owner` goes to the owner before it becomes canon.
+
+### 6. Foundry VTT tooling
 
 Keep importer format, clickable prose, and system implementation separate.
 
@@ -206,7 +230,7 @@ Keep importer format, clickable prose, and system implementation separate.
 Importer rule: main statblock importer text must be plain WotC-style prose.
 Foundry enrichers belong only in a separate post-import section.
 
-### 6. Campaign design, creative prep, and outside inspiration
+### 7. Campaign design, creative prep, and outside inspiration
 
 Use these to design campaign material and produce table-facing output, not to
 answer local canonical facts.
@@ -228,12 +252,12 @@ campaign design.
 
 Image generation is metered; only call it on explicit user request.
 
-### 7. System maintenance and destructive cleanup
+### 8. System maintenance and destructive cleanup
 
 | Task trigger | Use |
 |---|---|
 | qmd refresh/reindex/rebuild/collection verification | `ttrpg-system-qmd-maintenance` |
-| Destructive cleanup/reset/purge/remove of vault/import/index data | `ttrpg-system-data-cleanup` |
+| Destructive cleanup/reset/purge/remove of vault/import/index/session data | `ttrpg-system-data-cleanup` |
 | Add/change a skill, prompt, tool, MCP server, or harness adapter; a harness stops discovering project resources; caches leak outside the project; something under `.claude/` or `.pi/` looks hand-edited | `ttrpg-harness-engineering` |
 | First-run setup, dependency check, `.env` configuration | `/bootstrap`, or `.agents/harness doctor` directly |
 
@@ -253,6 +277,10 @@ confirmation before deletion.
   quoting/summarizing.
 - **PDF ingest:** navigation → `ttrpg-import-book-pdf` (CLI returns ordered
   `next_steps` covering classify/summarize/tag/qmd; run them).
+- **Session recording:** `ttrpg-session-ingest` chain (plan → craig-stt
+  transcribe → adopt → qa → render → segment/extract → recap + record; follow
+  `next_steps`) → agent writes the session note via `ttrpg-vault-authoring` from
+  `record.json` + `recap.draft.md` → `qmd update`.
 - **OSR monster to Foundry:** source lookup → `ttrpg-rules-osr-to-5e` →
   `ttrpg-foundry-statblock-importer` → optional Foundry enrichers → vault
   authoring if saved.
@@ -357,7 +385,10 @@ going forward. Prefer `$TTRPG_5ETOOLS_DIR` in commands.
   `settings.local.json`, plus `.pi/prompts/`, `.pi/chains/`, `.pi/agents/`,
   `.mcp.json`, `.codex/config.toml`, and `CLAUDE.md`. Change `.agents/` and run `.agents/harness sync`.
 - Don't propose paid-cloud workflows when a local OSS path exists.
-- Don't hand-edit `vault/library/books/`; re-ingest instead.
+- Don't hand-edit `vault/library/books/`; re-ingest instead. Same for
+  `vault/transcripts/<session-id>/`; fix `_lexicon.yaml` and re-render instead.
+- Don't read raw transcription datasets or rendered transcript chunks directly;
+  go through `session-ingest` (`grep`, `record.json`) or `qmd -c transcripts`.
 - Don't leave durable notes isolated: add body wikilinks and useful
   connections.
 

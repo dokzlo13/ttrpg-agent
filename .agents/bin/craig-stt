@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Tier 1 hermetic entrypoint: the pinned upstream craig-stt transcription CLI.
+#
+# Runs in craig-stt's own isolated venv (faster-whisper + ctranslate2 + the
+# ~2 GB of nvidia CUDA wheels live there, not globally). uv creates/repairs
+# .venv on demand — the first run is slow by design; see manifest.toml's
+# `install = false` and the Tier L rows.
+set -uo pipefail
+
+# Resolve this script through any symlinks BEFORE deriving the repo root.
+# `ln -s <repo>/.agents/bin/qmd ~/.local/bin/qmd` would otherwise make
+# dirname/../.. evaluate to /home, and env.sh would build the whole project
+# skeleton there. Directory symlinks are handled by `cd`+`pwd -P`; this loop
+# covers file symlinks.
+_ttrpg_self="${BASH_SOURCE[0]}"
+while [ -L "$_ttrpg_self" ]; do
+  _ttrpg_link="$(readlink "$_ttrpg_self")"
+  case "$_ttrpg_link" in
+    /*) _ttrpg_self="$_ttrpg_link" ;;
+    *) _ttrpg_self="$(dirname -- "$_ttrpg_self")/$_ttrpg_link" ;;
+  esac
+done
+TTRPG_ROOT="$(cd -- "$(dirname -- "$_ttrpg_self")/../.." && pwd -P)"
+unset _ttrpg_self _ttrpg_link
+export TTRPG_ROOT
+# A tool must never emit env.sh's KEY=VALUE dump on its own stdout; on
+# .agents/bin/foundry-mcp that would corrupt the MCP JSON-RPC stream.
+unset TTRPG_ENV_DUMP
+# shellcheck disable=SC1091
+source "$TTRPG_ROOT/.agents/env.sh"
+
+# The one deviation from the plain launcher template, and it does two jobs:
+#
+#   1. It gives the owner a project-owned channel for the parts of craig-stt's
+#      configuration that are genuinely nested (e.g. `audio.filters` lists) and
+#      therefore awkward or impossible to express as CRAIG_STT_* env vars.
+#   2. More importantly it SHADOWS the host's `~/.config/craig-stt/config.toml`.
+#      Upstream's `find_config_file()` walks the user config dir and silently
+#      adopts whatever it finds there as a settings source — so an unrelated
+#      file in $HOME could quietly change this project's transcription settings.
+#      Passing `--config` explicitly makes the project's own file the only one.
+#
+# `--config` is a GLOBAL option: it must precede the subcommand, not follow it.
+# That is why it is spliced in here rather than appended to "$@".
+if [ -f "$TTRPG_STATE_DIR/craig-stt.toml" ]; then
+  exec uv run --project "$TTRPG_CLI_DIR/craig-stt" craig-stt \
+    --config "$TTRPG_STATE_DIR/craig-stt.toml" "$@"
+fi
+
+exec uv run --project "$TTRPG_CLI_DIR/craig-stt" craig-stt "$@"

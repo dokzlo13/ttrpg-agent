@@ -1,0 +1,18 @@
+[project]
+name = "ttrpg-craig-stt"
+version = "0.1.0"
+description = "Dependency-only launcher project pinning the upstream craig-stt transcription CLI."
+requires-python = ">=3.13"
+dependencies = ["craig-stt[cuda]"]
+
+# No source of our own: this project exists solely to give `uv run --project`
+# a resolvable, locked environment for the upstream CLI.
+[tool.uv]
+package = false
+
+# Pinned by SHA — no tags exist upstream yet. When a `dataset-v1.0.0` tag is
+# pushed, swap `rev` -> `tag` here AND in .agents/cli/session-ingest (which
+# takes craig-stt-dataset from the same commit) in one change set, then relock
+# both and re-run the consumer contract test.
+[tool.uv.sources]
+craig-stt = { git = "https://github.com/dokzlo13/craig-stt", rev = "768de46ac9b1caebb32e2f9cda8531e1a300bc4f" }

@@ -18,12 +18,14 @@
   "permissions": {
     "allow": [
       "Bash(.agents/bin/book-ingest:*)",
+      "Bash(.agents/bin/craig-stt:*)",
       "Bash(.agents/bin/foundry-mcp:*)",
       "Bash(.agents/bin/generate-image:*)",
       "Bash(.agents/bin/marker-single:*)",
       "Bash(.agents/bin/qmd:*)",
       "Bash(.agents/bin/qmd-cpu:*)",
       "Bash(.agents/bin/query-5etools:*)",
+      "Bash(.agents/bin/session-ingest:*)",
       "Bash(.agents/bin/vault-frontmatter:*)",
       "Bash(.agents/bin/vault-sync:*)",
       "Bash(.agents/harness:*)"
