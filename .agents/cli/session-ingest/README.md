@@ -62,7 +62,8 @@ plan → craig-stt transcribe --json (GPU ~10 min) → adopt → qa
   │                                                                         └─ record
   └─ thresholds crossed → glossary → plan --run 2 → craig-stt (scratch dir, LOCAL zip,
        no re-download) → adopt --run 2 → qa --run 2 --compare 1 → adopt --promote → render …
-then: view → the AGENT drafts the chronicle + inbox → chronicle --check → prune
+then: view → the AGENT drafts the chronicle (owner questions inside it) → in-chat
+  owner review → chronicle --check → chronicle --freeze → prune
 ```
 
 `next_steps` is the ordering authority. Run what it returns, in order; do not
@@ -99,7 +100,7 @@ All fifteen verbs are implemented. `det.` verbs need no API key and no network;
 | `recap` | metered | Russian recap from `extraction.json` only; every bullet ends in an evidence link |
 | `record` | **det.** | Assemble and schema-validate `record.json`. No second LLM pass — works without a key. Resolves entity names to slugs and vault notes through `state/entity-registry.md` |
 | `view` | det. | **The read path into `record.json`**: compact Markdown, one line per element, one evidence link. `--needs-owner`, `--scene`, `--kind`, `--section`, `--links`, `--min-confidence` |
-| `chronicle` | det. | `--check` the agent-authored session note: every `[[transcripts/…#^t…]]` citation resolved against `anchors.json`, frontmatter completeness. Read-only — the CLI never writes `vault/notes/` |
+| `chronicle` | det. | `--check` the agent-authored session note: every `[[transcripts/…#^t…]]` citation resolved against `anchors.json`, frontmatter completeness, no open `## Вопросы владельцу` on a canon note, freeze-digest integrity. `--freeze` records the canon note's content digest (the append-allowed `## Реконсиляция` excluded) in `.cache/sessions/<id>/chronicle.freeze.json` — the only thing this verb ever writes, and never `vault/notes/`. `--status` sweeps the whole `vault/notes/sessions/` ledger: per-note status, open questions, drift — the mechanical "am I caught up?" |
 | `glossary` | metered | Attach observed variants to canonical terms; append-only `_lexicon.yaml` merge |
 | `prune` | det. | SDK `prune()`; never `rm`; refuses while the chronicle is unwritten |
 
@@ -123,7 +124,7 @@ All fifteen verbs are implemented. `det.` verbs need no API key and no network;
 | `recap` | `--session` `--audience dm\|players` `--force` `--json` |
 | `record` | `--session` `--run N` `--force` `--json` |
 | `view` | `--session` `--section NAME` (repeatable) `--scene ID` `--kind NAME` `--needs-owner` `--min-confidence F` `--links N` `--no-header` `--json` |
-| `chronicle` | `--session` `--check` `--json` |
+| `chronicle` | `--session` `--check` `--freeze` `--status` `--json` (`--status` needs no `--session`) |
 | `glossary` | `--session` `--run N` `--budget-chars N` `--force` `--json` |
 | `prune` | `--session` `--dry-run` `--force` `--json` |
 
@@ -293,7 +294,10 @@ re-transcribing anything.
 **`--promote`** repoints the active run and **refuses when a chronicle note
 matching `vault/notes/sessions/*<session-id>*.md` exists** — a re-transcription
 renumbers every segment and shifts every turn ID, so promoting would silently
-break approved evidence links. `--force-relink` overrides and warns.
+break approved evidence links. Plain `adopt` refuses for the same reason when it
+would **replace the active run's dataset** under an existing chronicle (one
+session = one transcription adoption); adopting an additional `--run N` for
+comparison stays free. `--force-relink` overrides either refusal and warns.
 
 ## What `qa` measures
 
@@ -373,7 +377,7 @@ if they are absent.
 | `TTRPG_SESSIONS_DIR` | `.cache/sessions` — session-derived artifacts |
 | `TTRPG_SESSION_DATASETS_DIR` | `.cache/sessions/datasets`, also `CRAIG_STT_WORK_DIR` |
 | `TTRPG_TRANSCRIPTS_DIR` | `vault/transcripts` — rendered Markdown and the two hand-maintained YAML files |
-| `TTRPG_NOTES_DIR` | `vault/notes` — layer 2. The CLI only ever **reads** here: `state/entity-registry.md` for name resolution, `sessions/` for the chronicle gates. It has no write path into this tree |
+| `TTRPG_NOTES_DIR` | `vault/notes` — layer 2. The CLI only ever **reads** here: `state/entity-registry.md` for name resolution, `sessions/` for the chronicle gates. It has no write path into this tree (`chronicle --freeze` writes its digest record under `.cache/sessions/<id>/`, not here) |
 
 Tunables, resolved CLI > env > default (`.env` is a fallback only; the process
 environment always wins):
@@ -410,6 +414,7 @@ An unparseable value is discarded and reported as `[default]`, never as `[env]`.
     ├── anchors.json           {segment_i → turn_id, chunk, t0} — the ID bridge
     ├── extraction.json        map-reduce output
     ├── record.json            THE layer-2 handoff
+    ├── chronicle.freeze.json  freeze record: per-note digests written by `chronicle --freeze`
     ├── recap.draft.md
     └── index.sqlite           FTS for `grep` (disposable)
 
@@ -419,9 +424,10 @@ vault/transcripts/
 └── <session-id>/              rendered chunks + overview
 
 vault/notes/                   layer 2 — READ-ONLY to this CLI, written by the agent
-├── sessions/sNNN-<id>-*.md    the chronicle. `prune` and `adopt --promote` glob for the id
+├── sessions/sNNN-<id>-*.md    the chronicle. `prune` and `adopt --promote` glob for the id;
+│                              a draft carries its owner questions until answered in chat
 ├── state/entity-registry.md   canonical-name table; `record` resolves slugs and vault notes here
-└── inbox/ npcs/ locations/ factions/
+└── npcs/ locations/ factions/
 ```
 
 `_speakers.yaml` and `_lexicon.yaml` are the only two non-regenerable files in

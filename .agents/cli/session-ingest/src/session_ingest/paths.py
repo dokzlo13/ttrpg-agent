@@ -93,11 +93,6 @@ class Roots:
         return self.notes / "state"
 
     @property
-    def inbox_dir(self) -> Path:
-        """``vault/notes/inbox/`` — pending owner proposals; empty means caught up."""
-        return self.notes / "inbox"
-
-    @property
     def entity_registry_file(self) -> Path:
         """The canonical-name table that maps ``record.json`` names onto slugs."""
         return self.state_dir / "entity-registry.md"
@@ -235,6 +230,18 @@ class SessionTree:
     @property
     def index_sqlite(self) -> Path:
         return self.root / "index.sqlite"
+
+    @property
+    def chronicle_freeze_json(self) -> Path:
+        """The freeze record ``chronicle --freeze`` writes: per-note content digests.
+
+        Lives in the session tree, not the vault — the CLI has no write path into
+        ``vault/notes/`` and the digest must not sit inside the file it attests
+        (a note that carries its own hash can be edited and re-hashed in one
+        motion). Deleting it degrades enforcement back to convention: ``--check``
+        then reports "no freeze record" as a fact, never as corruption.
+        """
+        return self.root / "chronicle.freeze.json"
 
     # ------------------------------------------------------------ vault-facing
 

@@ -20,9 +20,8 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 | Path | Read? | Write? | Notes |
 |---|---:|---:|---|
 | `vault/notes/` | yes | yes | Active authored campaign notes, prep, canvases, images. Use `ttrpg-vault-authoring` before durable writes. |
-| `vault/notes/sessions/` | yes | via `ttrpg-session-chronicle` | Append-only chronicle of **played** sessions, `sNNN-YYYY-MM-DD-<slug>.md`. Frozen once `status: canon` — corrections are retcon events, not edits. `prune` and `adopt --promote` both glob this directory for the session id. |
+| `vault/notes/sessions/` | yes | via `ttrpg-session-chronicle` | Append-only chronicle of **played** sessions, `sNNN-YYYY-MM-DD-<slug>.md`. A draft carries its owner questions in `## Вопросы владельцу`; frozen once `status: canon` + `chronicle --freeze` — corrections are retcon events, not edits. `prune` and `adopt --promote` both glob this directory for the session id. `chronicle --status` is the "am I caught up?" sweep. |
 | `vault/notes/state/` | yes | agent-regenerated | Derived projections: `current-state.md`, `story-state.md`, `clocks.md`, `calendar.md`, `entity-registry.md`. `story-state.md` is agent-owned outright; hand edits there are overwritten. |
-| `vault/notes/inbox/` | yes | via `ttrpg-session-chronicle` | Per-session proposals awaiting the owner. Empty means caught up. |
 | `vault/notes/npcs\|locations\|factions/` | yes | yes | Entities promoted out of the roster; every fact bullet cites a session block. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. Don't hand-edit chapters. |
 | `vault/transcripts/` | via qmd/grep | only via `session-ingest render` | Rendered session transcripts. Machine-generated and regenerable; never `cat`/Read a chunk. The two `_*.yaml` files are the hand-maintained exception. |
@@ -100,8 +99,8 @@ vault/transcripts/                # small, Obsidian-visible, qmd-indexed
 └── <session-id>/                 # derived: anchors.json, extraction.json, record.json, recap.draft.md
 
 vault/notes/                      # layer 2 — the campaign tracker (ttrpg-session-chronicle)
-├── sessions/sNNN-YYYY-MM-DD-*.md # append-only play records; block-ID'd fact ledger
-├── inbox/sNNN-proposals.md       # the one file the owner reads after a session
+├── sessions/sNNN-YYYY-MM-DD-*.md # append-only play records; block-ID'd fact ledger;
+│                                 # a draft holds its owner questions until answered in chat
 ├── state/                        # regenerated projections + entity-registry.md
 └── npcs/ locations/ factions/    # promoted entities, every fact cited
 ```
@@ -159,8 +158,8 @@ absent.
   rich-note/canvas skills.
 - New or changed ingested book? Use `ttrpg-import-book-pdf` / `book-ingest`.
 - New session recording or transcript? Use `ttrpg-session-ingest` for the
-  pipeline, then `ttrpg-session-chronicle` for the durable record, inbox and
-  projections. A played-session record is never hand-placed by
-  `ttrpg-vault-authoring`.
+  pipeline, then `ttrpg-session-chronicle` for the durable record, the in-chat
+  owner review and the projections. A played-session record is never hand-placed
+  by `ttrpg-vault-authoring`.
 - Promoting old-vault content? Use `ttrpg-import-archive-vault`.
 - Search/index stale? Use `ttrpg-system-qmd-maintenance`.

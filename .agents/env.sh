@@ -243,7 +243,6 @@ mkdir -p \
   "$PROJECT_ROOT/vault/notes/readalouds" \
   "$TTRPG_NOTES_DIR/sessions" \
   "$TTRPG_NOTES_DIR/state" \
-  "$TTRPG_NOTES_DIR/inbox" \
   "$TTRPG_NOTES_DIR/npcs" \
   "$TTRPG_NOTES_DIR/locations" \
   "$TTRPG_NOTES_DIR/factions" \

@@ -65,9 +65,8 @@ skills when creating durable active-vault content.
 | `imports/source-vault/` | yes | **no** | Legacy archive, read-only. |
 | `imports/fvtt-data/` | yes | **yes** | The one writable exception under `imports/`: local staging for targeted Foundry VTT exports. |
 | `vault/notes/` | yes | yes | Active authored campaign notes and table prep. |
-| `vault/notes/sessions/` | yes | only via `ttrpg-session-chronicle` | Append-only records of **played** sessions. Frozen at `status: canon`; corrections are retcon events, not edits. `prune` and `adopt --promote` glob here for the session id. |
+| `vault/notes/sessions/` | yes | only via `ttrpg-session-chronicle` | Append-only records of **played** sessions. A draft carries its owner questions (`## Вопросы владельцу`, answered in chat); frozen at `status: canon` + `chronicle --freeze`; corrections are retcon events, not edits. `prune` and `adopt --promote` glob here for the session id; `chronicle --status` is the caught-up probe. |
 | `vault/notes/state/` | yes | agent-regenerated | Projections: `current-state`, `story-state`, `clocks`, `calendar`, `entity-registry`. `story-state.md` is agent-owned — hand edits are overwritten. |
-| `vault/notes/inbox/` | yes | only via `ttrpg-session-chronicle` | Per-session proposals the owner reviews. Empty means caught up. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. |
 | `vault/transcripts/` | via qmd / `session-ingest grep` | only via `session-ingest render` | Rendered session transcripts: machine-owned and regenerable. `_speakers.yaml` and `_lexicon.yaml` are the hand-maintained exception. |
 
@@ -284,9 +283,11 @@ confirmation before deletion.
   `next_steps` covering classify/summarize/tag/qmd; run them).
 - **Session recording:** `ttrpg-session-ingest` chain (plan → craig-stt
   transcribe → adopt → qa → render → segment/extract → recap + record; follow
-  `next_steps`) → `session-ingest view` → agent writes the chronicle, inbox and
-  projections via `ttrpg-session-chronicle` → `session-ingest chronicle --check`
-  → `qmd update` → offer `prune`.
+  `next_steps`) → `session-ingest view` → agent writes the draft chronicle and
+  asks the owner its questions **in chat** via `ttrpg-session-chronicle` →
+  applies answers, regenerates projections, sets `status: canon` →
+  `session-ingest chronicle --check` → `chronicle --freeze` → `qmd update` →
+  offer `prune`. One session = one adoption = one review = one freeze.
 - **OSR monster to Foundry:** source lookup → `ttrpg-rules-osr-to-5e` →
   `ttrpg-foundry-statblock-importer` → optional Foundry enrichers → vault
   authoring if saved.

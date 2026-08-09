@@ -22,7 +22,7 @@ Two layers, one handoff:
 LAYER 1 — the pipeline (this skill)
   share URL ─► craig-stt ─► dataset ─► session-ingest ─► transcript + recap.draft.md + record.json
 LAYER 2 — the campaign tracker (ttrpg-session-chronicle)
-  record.json + recap.draft.md ─► AGENT ─► chronicle + inbox + state/ projections
+  record.json + recap.draft.md ─► AGENT ─► chronicle + in-chat owner review + state/ projections
 ```
 
 `record.json` is the **only** thing layer 2 reads from layer 1. The verbatim
@@ -46,9 +46,10 @@ the prose — reach for the default text output when the goal is reading.
 - "What did X actually say about Y?" — see [Fact-checking](#fact-checking-what-was-said).
 
 **Don't use this for:** writing the durable session record — that is
-`ttrpg-session-chronicle`, which owns the chronicle, the proposals inbox and the
-`state/` projections. Nor for campaign/arc design (`ttrpg-campaign-design`) or
-prose lookup in books and prep notes (`ttrpg-library-search`).
+`ttrpg-session-chronicle`, which owns the chronicle, the in-chat owner review
+and the `state/` projections. Nor for campaign/arc design
+(`ttrpg-campaign-design`) or prose lookup in books and prep notes
+(`ttrpg-library-search`).
 
 ## The chain
 
@@ -58,7 +59,8 @@ plan → craig-stt transcribe --json (GPU ~10 min) → adopt → qa
   │                                                                         └─ record
   └─ thresholds crossed → glossary → plan --run 2 → craig-stt (scratch dir, LOCAL zip,
        no re-download) → adopt --run 2 → qa --run 2 --compare 1 → adopt --promote → render …
-then: view → the AGENT authors the chronicle (ttrpg-session-chronicle) → chronicle --check → prune
+then: view → the AGENT authors the chronicle + runs the in-chat owner review
+  (ttrpg-session-chronicle) → chronicle --check → chronicle --freeze → prune
 ```
 
 **`--json` `next_steps` is the ordering authority**, exactly as with
@@ -101,7 +103,7 @@ or will refuse, when a skipped track carries no category at all.
 | Verb | Kind | Purpose |
 |---|---|---|
 | `view` | det. | **The read path into `record.json`.** Compact Markdown, one line per element, one evidence link each; `--needs-owner --scene --kind --section --links` |
-| `chronicle --check` | det. | Verify the agent-authored session note: every citation resolves through `anchors.json`, frontmatter is complete. Never writes |
+| `chronicle` | det. | `--check`: every citation resolves through `anchors.json`, frontmatter complete, freeze intact. `--freeze`: record the canon note's digest in the session tree (never writes `vault/notes/`). `--status`: sweep the whole ledger — the mechanical "am I caught up?" |
 | `doctor` | det. | Roots, disk by class, SDK vs dataset versions, craig-stt presence, key presence, qmd collection state |
 | `lexicon` | det. | List the loaded lexicon terms; `--expand` also prints every generated case form and skip reason. Read-only |
 | `plan` | det. (`--rank` metered) | Build the biasing files from `_lexicon.yaml`; emit the exact `craig-stt transcribe … --json` command. The biasing flags reach that command only under `--with-biasing` |
@@ -288,7 +290,7 @@ key fails loudly instead of silently un-biasing a ten-minute GPU run. Don't
 └── <session-id>/              session-ingest's derived artifacts:
                                session.json · provenance.json · inputs/ · runs/<N>/qa.json ·
                                anchors.json · extraction.json · record.json · recap.draft.md ·
-                               index.sqlite
+                               chronicle.freeze.json · index.sqlite
 
 vault/transcripts/
 ├── _speakers.yaml             hand-maintained: discord user_id → player/character/role

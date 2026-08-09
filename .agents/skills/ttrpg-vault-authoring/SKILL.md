@@ -198,7 +198,7 @@ These are hints, not laws. Prefer an existing better local folder when one exist
 | faction | `vault/notes/factions/<slug>.md` |
 | **record of a played session** | `vault/notes/sessions/sNNN-YYYY-MM-DD-<slug>.md` — **via `ttrpg-session-chronicle`**, not by hand. The filename must contain the session id; `prune` and `adopt --promote` glob for it |
 | **prep for a future session** | arc folder under `vault/notes/campaign/arcs/<arc>/`, `type: prep` — never `sessions/` |
-| owner proposals awaiting review | `vault/notes/inbox/sNNN-proposals.md` (`ttrpg-session-chronicle`) |
+| owner questions awaiting review | inside the draft session record's `## Вопросы владельцу` section (`ttrpg-session-chronicle`) — never a separate file |
 | derived state projection | `vault/notes/state/` — regenerated; `story-state.md` is agent-owned outright |
 | monster/item/spell/rule | `vault/notes/mechanics/<kind>/<slug>.md` |
 | read-aloud | `vault/notes/readalouds/<slug>.md` |

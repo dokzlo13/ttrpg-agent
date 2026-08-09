@@ -259,6 +259,8 @@ def next_steps_for(
     archive: str = ARCHIVE_PLACEHOLDER,
     dataset_hint: str = "<dataset|recording-id>",
     clean: bool = False,
+    canon: bool = False,
+    frozen: bool = False,
 ) -> list[dict[str, Any]]:
     """Ordered steps to run after ``verb`` succeeded."""
     session = _session_flag(session_id)
@@ -369,9 +371,11 @@ def next_steps_for(
             step(
                 "ingest_chronicle",
                 (
-                    "Agent step: draft the session chronicle under vault/notes/sessions/ and the "
-                    "proposals inbox, following the ttrpg-session-chronicle skill. The CLI has no "
-                    "write path into vault/notes/ — the agent is the only writer."
+                    "Agent step: draft the session chronicle (status: draft, owner questions in "
+                    "its `## Вопросы владельцу` section) under vault/notes/sessions/, then ask "
+                    "the owner those questions IN CHAT, apply the answers, and freeze — "
+                    "following the ttrpg-session-chronicle skill. The CLI has no write path "
+                    "into vault/notes/ — the agent is the only writer."
                 ),
                 required=False,
             ),
@@ -388,9 +392,10 @@ def next_steps_for(
             step(
                 "ingest_chronicle",
                 (
-                    "Agent step: draft the chronicle and the inbox from what you just read. "
-                    "Reconcile against existing canon before writing — a DM recap of earlier "
-                    "play looks exactly like this session's events in the record."
+                    "Agent step: draft the chronicle from what you just read, owner questions "
+                    "in its `## Вопросы владельцу` section, and ask them in chat. Reconcile "
+                    "against existing canon before writing — a DM recap of earlier play looks "
+                    "exactly like this session's events in the record."
                 ),
                 required=False,
             )
@@ -414,6 +419,39 @@ def next_steps_for(
                     command=f"{CLI} chronicle{session} --check",
                     required=False,
                 ),
+            ]
+        if not canon:
+            # A clean draft is a note waiting for its owner, not a note waiting
+            # for a tool: the review is an in-chat step of the same conversation.
+            return [
+                step(
+                    "owner_review",
+                    (
+                        "Agent step: ask the owner the note's `## Вопросы владельцу` questions "
+                        "in chat, apply the answers into `## Реконсиляция` (block IDs ^sN-dNN) "
+                        "and the affected canon, delete the questions section, set "
+                        "`status: canon`, then re-check."
+                    ),
+                    required=False,
+                ),
+                step(
+                    "recheck",
+                    "Re-run the check once the review is applied.",
+                    command=f"{CLI} chronicle{session} --check",
+                    required=False,
+                ),
+            ]
+        if not frozen:
+            return [
+                step(
+                    "freeze",
+                    (
+                        "Record the canon note's content digest so any later edit outside "
+                        "`## Реконсиляция` is detected instead of silent."
+                    ),
+                    command=f"{CLI} chronicle{session} --freeze",
+                    required=False,
+                )
             ]
         return [
             step(

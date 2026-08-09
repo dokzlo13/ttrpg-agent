@@ -1,4 +1,4 @@
-"""adopt's four gates, and the session.json it writes when they all pass."""
+"""adopt's five gates, and the session.json it writes when they all pass."""
 
 from __future__ import annotations
 
@@ -302,6 +302,49 @@ def test_promote_refuses_when_a_chronicle_exists(workspace: Workspace) -> None:
     forced = _adopt(workspace, promote=True, force=True, force_relink=True)
     assert forced.status == "ok"
     assert any("re-linking" in warning for warning in forced.warnings)
+
+
+def test_readopting_the_active_run_over_a_chronicle_refuses(workspace: Workspace) -> None:
+    """One session = one transcription adoption — enforced, not just documented.
+
+    Replacing the active dataset regenerates every turn ID at the next render,
+    so the chronicle's approved evidence links would silently point at the wrong
+    words. `--force` does not lift this: it is the provenance rewrite flag, not
+    consent to break the note.
+    """
+    _adopt(workspace)
+    workspace.write_chronicle()
+    rerun_dir = _rerun_dataset(workspace.roots.scratch / "redo" / RECORDING_ID, "Реплика 0…")
+    with pytest.raises(DatasetAdoptError) as excinfo:
+        _adopt(workspace, target=str(rerun_dir), force=True)
+    error = excinfo.value
+    assert error.code == "chronicle_exists"
+    # Both escape hatches are spelled out: a comparison run, or a deliberate relink.
+    assert [entry["id"] for entry in error.next_steps] == ["adopt_new_run", "relink_chronicle"]
+
+    relinked = _adopt(workspace, target=str(rerun_dir), force_relink=True)
+    assert relinked.status == "ok"
+    assert any("re-linking" in warning for warning in relinked.warnings)
+
+
+def test_readopting_a_comparison_run_beside_a_chronicle_stays_free(
+    workspace: Workspace,
+) -> None:
+    """An A/B run does not touch the active dataset, so the chronicle is safe."""
+    _adopt(workspace)
+    workspace.write_chronicle()
+    rerun_dir = _rerun_dataset(workspace.roots.scratch / "run2" / RECORDING_ID, "Реплика 0!")
+    second = _adopt(workspace, target=str(rerun_dir), run=2)
+    assert second.status == "ok"
+    assert second.active_run == 1
+
+
+def test_readopting_the_same_dataset_still_skips_if_done(workspace: Workspace) -> None:
+    """The gate watches the digest, so an identical re-adopt stays a no-op skip."""
+    _adopt(workspace)
+    workspace.write_chronicle()
+    again = _adopt(workspace)
+    assert again.status == "skipped"
 
 
 def test_promotion_invalidates_downstream_provenance(workspace: Workspace) -> None:

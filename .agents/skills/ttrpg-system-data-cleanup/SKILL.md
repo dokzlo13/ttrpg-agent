@@ -57,7 +57,7 @@ source ./.agents/env.sh
 For reference, that produces:
 
 ```text
-vault/notes{,/images,/mechanics,/readalouds,/sessions,/state,/inbox,/npcs,/locations,/factions}
+vault/notes{,/images,/mechanics,/readalouds,/sessions,/state,/npcs,/locations,/factions}
 vault/library/books
 vault/transcripts     # rendered session transcripts + the two _*.yaml files
 imports/books  imports/source-vault  imports/fvtt-data
@@ -305,7 +305,7 @@ stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-active-notes.txt"
 find vault/notes -mindepth 1 -print 2>/dev/null | sort > "$manifest" || true
 find vault/notes -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,inbox,npcs,locations,factions}
+mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,npcs,locations,factions}
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -409,7 +409,7 @@ for dir in vault/notes vault/library/books vault/images; do
     find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   fi
 done
-mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,inbox,npcs,locations,factions} vault/library/books
+mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,npcs,locations,factions} vault/library/books
 printf 'Manifest: %s\n' "$manifest"
 ```
 

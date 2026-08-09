@@ -150,11 +150,17 @@ def test_record_points_the_agent_at_layer_two() -> None:
     assert "no write path into vault/notes/" in steps[2]["summary"]
 
 
-def test_chronicle_check_gates_prune_only_when_clean() -> None:
+def test_chronicle_check_walks_repair_review_freeze_then_prune() -> None:
+    """The chain is the protocol: fix → owner review in chat → freeze → prune."""
     dirty = next_steps_for("chronicle", session_id=SESSION, clean=False)
     assert [entry["id"] for entry in dirty] == ["fix_chronicle", "recheck"]
-    clean = next_steps_for("chronicle", session_id=SESSION, clean=True)
-    assert [entry["id"] for entry in clean] == ["prune"]
+    draft = next_steps_for("chronicle", session_id=SESSION, clean=True)
+    assert [entry["id"] for entry in draft] == ["owner_review", "recheck"]
+    assert "IN CHAT" in draft[0]["summary"].upper()
+    unfrozen = next_steps_for("chronicle", session_id=SESSION, clean=True, canon=True)
+    assert [entry["id"] for entry in unfrozen] == ["freeze"]
+    frozen = next_steps_for("chronicle", session_id=SESSION, clean=True, canon=True, frozen=True)
+    assert [entry["id"] for entry in frozen] == ["prune"]
 
 
 def test_terminal_verbs_have_no_next_step() -> None:

@@ -754,28 +754,62 @@ def cmd_view(
     execute(app, "view", body)
 
 
-@cli.command("chronicle", short_help="Check the agent-authored session note in vault/notes/.")
+@cli.command("chronicle", short_help="Check, freeze, or sweep the agent-authored session notes.")
 @session_option
 @click.option(
     "--check",
     "check",
     is_flag=True,
-    help="Verify citations and frontmatter. The only mode — the CLI never writes a chronicle.",
+    help="Verify citations, frontmatter, and freeze integrity for one session (the default).",
+)
+@click.option(
+    "--freeze",
+    "freeze",
+    is_flag=True,
+    help=(
+        "Record the canon chronicle's content digest under .cache/sessions/<id>/ so later "
+        "edits outside `## Реконсиляция` are detected. Refuses while the note is draft or "
+        "fails --check. Never writes vault/notes/."
+    ),
+)
+@click.option(
+    "--status",
+    "status",
+    is_flag=True,
+    help=(
+        "Sweep every note under vault/notes/sessions/: status, open owner questions, freeze "
+        "drift. The mechanical 'am I caught up?' — needs no --session."
+    ),
 )
 @json_option
 @click.pass_context
 def cmd_chronicle(
-    ctx: click.Context, session_id: str | None, check: bool, json_output: bool
+    ctx: click.Context,
+    session_id: str | None,
+    check: bool,
+    freeze: bool,
+    status: bool,
+    json_output: bool,
 ) -> None:
-    """Read-only. The agent writes the chronicle; this says whether it is wired up."""
+    """The agent writes the chronicle; this verifies it and attests the freeze."""
     app = _context(ctx, json_output)
+    if freeze and status:
+        raise click.UsageError("--freeze and --status are different modes; pass one.")
+    if check and (freeze or status):
+        raise click.UsageError("--check cannot be combined with --freeze/--status.")
 
     def body() -> tuple[dict[str, Any], Printer]:
         roots = app.roots()
+        if status:
+            emit_status([sourced("mode", "status", "cli")])
+            return chronicle_mod.run_status(roots=roots), _print_lines
         session, source = resolve_session(session_id, app, roots=roots)
-        # `--check` is the only mode; accepting it makes the documented invocation
-        # work, and the status line reports where the mode came from rather than
-        # pretending the flag changed something.
+        if freeze:
+            emit_status([f_session(session, source), sourced("mode", "freeze", "cli")])
+            return chronicle_mod.run_freeze(roots=roots, session_id=session), _print_lines
+        # `--check` is the default mode; accepting the flag makes the documented
+        # invocation work, and the status line reports where the mode came from
+        # rather than pretending the flag changed something.
         emit_status(
             [f_session(session, source), sourced("mode", "check", "cli" if check else "default")]
         )

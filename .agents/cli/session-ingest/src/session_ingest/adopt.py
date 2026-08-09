@@ -4,7 +4,7 @@ Everything here goes through ``craig_stt_dataset``. Parsing ``segments.jsonl`` o
 ``meta.json`` directly is the violation the producer contract exists to prevent
 (CONTRACT rule 1), so this module never opens a dataset file by name.
 
-Four gates, in order, each of which reports rather than decides:
+Five gates, in order, each of which reports rather than decides:
 
 1. **One dataset for the id.** Two candidates is an ambiguity the caller has to
    resolve; picking one would silently bind the wrong recording to a date.
@@ -22,6 +22,11 @@ Four gates, in order, each of which reports rather than decides:
    all is refused outright and no flag lifts it — an older craig-stt wrote that
    dataset without recording why the track went, so the fact adopt needs is not
    withheld but absent, and only a re-transcription can supply it.
+5. **One session = one transcription adoption.** Once a chronicle exists, both
+   promoting a re-run and re-adopting a different dataset onto the active run
+   refuse without ``--force-relink``: either would regenerate the turn IDs its
+   approved evidence links resolve through. Adding a run for A/B comparison
+   stays free.
 """
 
 from __future__ import annotations
@@ -562,6 +567,63 @@ def run_adopt(
                 f"{', '.join(str(p) for p in chronicles)}; its evidence links now need re-linking"
             )
 
+    # --- one session = one adoption ---------------------------------------------
+    # The protocol freezes a session once its chronicle is written: re-adopting a
+    # *different* dataset onto the ACTIVE run breaks the note exactly the way an
+    # un-forced promote would — render regenerates anchors.json from the new
+    # dataset and every approved evidence link silently goes stale. Adopting an
+    # additional run for A/B comparison stays free; it does not touch the active
+    # dataset until promoted, and promotion has its own gate above.
+    digest_before = link.dataset_digest
+    replaces_active = (
+        not promote
+        and digest_before is not None
+        and effective_run == target_active_run
+        and digest != digest_before
+    )
+    if replaces_active:
+        chronicles = tree.chronicle_candidates()
+        if chronicles and not force_relink:
+            listed = ", ".join(str(p) for p in chronicles)
+            raise DatasetAdoptError(
+                f"a session chronicle already exists for {effective_session} ({listed}) and "
+                f"this adoption would replace the active dataset "
+                f"({digest_before} → {digest}). One session takes one transcription adoption; "
+                f"after the chronicle is written its evidence links depend on the adopted "
+                f"run's turn IDs. Adopt into a new --run N for comparison, or pass "
+                f"--force-relink to replace the active dataset and re-link the chronicle.",
+                code="chronicle_exists",
+                detail={
+                    "chronicles": [str(p) for p in chronicles],
+                    "active_digest": digest_before,
+                    "new_digest": digest,
+                },
+                next_steps=[
+                    step(
+                        "adopt_new_run",
+                        "Adopt as an additional run instead; the active run stays intact.",
+                        command=(
+                            f"{CLI} adopt {target} --session {effective_session} "
+                            f"--run {max(link.runs(), default=1) + 1}"
+                        ),
+                        required=False,
+                    ),
+                    step(
+                        "relink_chronicle",
+                        "Replace the active dataset anyway and re-link the chronicle after.",
+                        command=(
+                            f"{CLI} adopt {target} --session {effective_session} --force-relink"
+                        ),
+                        required=False,
+                    ),
+                ],
+            )
+        if chronicles:
+            warnings.append(
+                "replaced the active dataset under an existing chronicle (--force-relink); "
+                "its evidence links now need re-linking"
+            )
+
     # --- skip-if-done ---------------------------------------------------------
     provenance = Provenance.load(tree.provenance_json)
     key = CompositeKey(
@@ -573,7 +635,6 @@ def run_adopt(
             "session": effective_session,
         },
     )
-    digest_before = link.dataset_digest
 
     if provenance.should_skip("adopt", key, force=force, root=tree.root):
         return AdoptResult(
