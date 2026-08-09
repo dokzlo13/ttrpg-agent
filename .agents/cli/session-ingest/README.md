@@ -62,7 +62,7 @@ plan → craig-stt transcribe --json (GPU ~10 min) → adopt → qa
   │                                                                         └─ record
   └─ thresholds crossed → glossary → plan --run 2 → craig-stt (scratch dir, LOCAL zip,
        no re-download) → adopt --run 2 → qa --run 2 --compare 1 → adopt --promote → render …
-then: the AGENT reads recap.draft.md + record.json, drafts the chronicle, offers prune
+then: view → the AGENT drafts the chronicle + inbox → chronicle --check → prune
 ```
 
 `next_steps` is the ordering authority. Run what it returns, in order; do not
@@ -82,7 +82,7 @@ with `--dry-run`, which writes no dataset to describe.
 
 ## CLI surface
 
-All thirteen verbs are implemented. `det.` verbs need no API key and no network;
+All fifteen verbs are implemented. `det.` verbs need no API key and no network;
 `metered` verbs call OpenAI and skip cleanly without a key.
 
 | Verb | Kind | Purpose |
@@ -97,7 +97,9 @@ All thirteen verbs are implemented. `det.` verbs need no API key and no network;
 | `segment` | metered | Per-turn `in_character\|table_talk\|mechanics\|ambiguous` + confidence |
 | `extract` | metered | Map-reduce over `turns(drop_bleed=True)` minus table talk; evidence + confidence + `world_impact` per event |
 | `recap` | metered | Russian recap from `extraction.json` only; every bullet ends in an evidence link |
-| `record` | **det.** | Assemble and schema-validate `record.json`. No second LLM pass — works without a key |
+| `record` | **det.** | Assemble and schema-validate `record.json`. No second LLM pass — works without a key. Resolves entity names to slugs and vault notes through `state/entity-registry.md` |
+| `view` | det. | **The read path into `record.json`**: compact Markdown, one line per element, one evidence link. `--needs-owner`, `--scene`, `--kind`, `--section`, `--links`, `--min-confidence` |
+| `chronicle` | det. | `--check` the agent-authored session note: every `[[transcripts/…#^t…]]` citation resolved against `anchors.json`, frontmatter completeness. Read-only — the CLI never writes `vault/notes/` |
 | `glossary` | metered | Attach observed variants to canonical terms; append-only `_lexicon.yaml` merge |
 | `prune` | det. | SDK `prune()`; never `rm`; refuses while the chronicle is unwritten |
 
@@ -120,6 +122,8 @@ All thirteen verbs are implemented. `det.` verbs need no API key and no network;
 | `extract` | `--session` `--run N` `--keep-bleed` `--force` `--json` |
 | `recap` | `--session` `--audience dm\|players` `--force` `--json` |
 | `record` | `--session` `--run N` `--force` `--json` |
+| `view` | `--session` `--section NAME` (repeatable) `--scene ID` `--kind NAME` `--needs-owner` `--min-confidence F` `--links N` `--no-header` `--json` |
+| `chronicle` | `--session` `--check` `--json` |
 | `glossary` | `--session` `--run N` `--budget-chars N` `--force` `--json` |
 | `prune` | `--session` `--dry-run` `--force` `--json` |
 
@@ -369,6 +373,7 @@ if they are absent.
 | `TTRPG_SESSIONS_DIR` | `.cache/sessions` — session-derived artifacts |
 | `TTRPG_SESSION_DATASETS_DIR` | `.cache/sessions/datasets`, also `CRAIG_STT_WORK_DIR` |
 | `TTRPG_TRANSCRIPTS_DIR` | `vault/transcripts` — rendered Markdown and the two hand-maintained YAML files |
+| `TTRPG_NOTES_DIR` | `vault/notes` — layer 2. The CLI only ever **reads** here: `state/entity-registry.md` for name resolution, `sessions/` for the chronicle gates. It has no write path into this tree |
 
 Tunables, resolved CLI > env > default (`.env` is a fallback only; the process
 environment always wins):
@@ -412,6 +417,11 @@ vault/transcripts/
 ├── _speakers.yaml             hand-maintained: discord user_id → player/character/role
 ├── _lexicon.yaml              variant → canonical; the biasing glossary AND the GEC dictionary
 └── <session-id>/              rendered chunks + overview
+
+vault/notes/                   layer 2 — READ-ONLY to this CLI, written by the agent
+├── sessions/sNNN-<id>-*.md    the chronicle. `prune` and `adopt --promote` glob for the id
+├── state/entity-registry.md   canonical-name table; `record` resolves slugs and vault notes here
+└── inbox/ npcs/ locations/ factions/
 ```
 
 `_speakers.yaml` and `_lexicon.yaml` are the only two non-regenerable files in
@@ -546,9 +556,10 @@ relock both, and re-run that test.
 | `models.py` | `session.json`, `qa.json` and `record.json` shapes, plus `validate_record` |
 | `provenance.py` `writer.py` | Composite digest keys / skip-if-done, and atomic writes |
 | `vaultfiles.py` | `_lexicon.yaml` and `_speakers.yaml` — the two non-regenerable files |
+| `registry.py` | `state/entity-registry.md`: the single fenced yaml block, exact-match resolution, the ordered cross-product of declared name forms |
 | `morphs.py` | `morph: true` case-form generation: paradigms, the case-paired table, the guardrails, the versioned digest |
 | `llm.py` | The metered plumbing: keyless skip, versioned prompts, schema-first calls, bounded map-reduce |
-| `doctor.py` `lexicon.py` `plan.py` `adopt.py` `qa.py` `render.py` `grep.py` `prune.py` | The deterministic verbs |
+| `doctor.py` `lexicon.py` `plan.py` `adopt.py` `qa.py` `render.py` `grep.py` `view.py` `chronicle.py` `prune.py` | The deterministic verbs |
 | `segment.py` `extract.py` `recap.py` `glossary.py` | The metered verbs |
 | `record.py` | Deterministic assembly of `record.json` + the `anchors.json` ID bridge |
 | `nextsteps.py` | The ordered `next_steps` every verb hands the agent |

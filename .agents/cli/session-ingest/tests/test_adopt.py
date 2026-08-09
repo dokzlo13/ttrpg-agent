@@ -25,7 +25,6 @@ def _adopt(workspace: Workspace, **kwargs):
     defaults: dict = {
         "target": str(workspace.dataset_dir),
         "roots": workspace.roots,
-        "project_root": workspace.project_root,
         "config": _config(),
         "allow_skipped_tracks": True,
     }
@@ -129,7 +128,6 @@ def test_ignored_tracks_need_no_flag(workspace: Workspace) -> None:
     result = run_adopt(
         target=str(workspace.dataset_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=_config(),
     )
     assert result.status == "ok"
@@ -236,7 +234,6 @@ def test_all_tracks_transcribed_needs_no_flag(workspace: Workspace) -> None:
     result = run_adopt(
         target=str(clean),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=_config(),
     )
     assert result.status == "ok"

@@ -28,6 +28,7 @@ from typing import Any
 
 import click
 
+from . import chronicle as chronicle_mod
 from . import extract as extract_mod
 from . import glossary as glossary_mod
 from . import grep as grep_mod
@@ -38,6 +39,7 @@ from . import recap as recap_mod
 from . import record as record_mod
 from . import render as render_mod
 from . import segment as segment_mod
+from . import view as view_mod
 from .adopt import run_adopt
 from .config import SessionConfig, build_env, find_project_root, resolve_config
 from .doctor import run_doctor
@@ -486,7 +488,6 @@ def cmd_adopt(
         result = run_adopt(
             target=target,
             roots=roots,
-            project_root=app.project_root,
             config=config,
             session_id=session_id,
             run=run,
@@ -684,6 +685,103 @@ def cmd_render(
 
 
 # -------------------------------------------------------------------- grep
+
+
+@cli.command("view", short_help="Compact, filterable read of record.json for the agent.")
+@session_option
+@click.option(
+    "--section",
+    "sections",
+    multiple=True,
+    type=click.Choice(view_mod.SECTIONS),
+    help="Restrict to these element families. Repeatable; default is all of them.",
+)
+@click.option("--scene", default=None, help="Only this scene id and the events inside it.")
+@click.option("--kind", default=None, help="Only rows whose `kind` matches exactly.")
+@click.option(
+    "--needs-owner",
+    is_flag=True,
+    help="Only events flagged needs_owner or world_impact != none.",
+)
+@click.option("--min-confidence", type=float, default=None, help="Drop rows below this confidence.")
+@click.option(
+    "--links", default=1, show_default=True, type=int, help="Evidence links to show per row."
+)
+@click.option("--no-header", is_flag=True, help="Omit the session summary block.")
+@json_option
+@click.pass_context
+def cmd_view(
+    ctx: click.Context,
+    session_id: str | None,
+    sections: tuple[str, ...],
+    scene: str | None,
+    kind: str | None,
+    needs_owner: bool,
+    min_confidence: float | None,
+    links: int,
+    no_header: bool,
+    json_output: bool,
+) -> None:
+    """Read the assembled record without paging the whole JSON into context."""
+    app = _context(ctx, json_output)
+
+    def body() -> tuple[dict[str, Any], Printer]:
+        roots = app.roots()
+        session, source = resolve_session(session_id, app, roots=roots)
+        emit_status(
+            [
+                f_session(session, source),
+                sourced("sections", ",".join(sections) if sections else "all", "cli"),
+                sourced("links", str(links), "cli"),
+            ]
+        )
+        return (
+            view_mod.run(
+                roots=roots,
+                session_id=session,
+                sections=list(sections) or None,
+                scene=scene,
+                kind=kind,
+                needs_owner=needs_owner,
+                min_confidence=min_confidence,
+                links=links,
+                header=not no_header,
+                include_lines=not app.json_output,
+            ),
+            _print_lines,
+        )
+
+    execute(app, "view", body)
+
+
+@cli.command("chronicle", short_help="Check the agent-authored session note in vault/notes/.")
+@session_option
+@click.option(
+    "--check",
+    "check",
+    is_flag=True,
+    help="Verify citations and frontmatter. The only mode — the CLI never writes a chronicle.",
+)
+@json_option
+@click.pass_context
+def cmd_chronicle(
+    ctx: click.Context, session_id: str | None, check: bool, json_output: bool
+) -> None:
+    """Read-only. The agent writes the chronicle; this says whether it is wired up."""
+    app = _context(ctx, json_output)
+
+    def body() -> tuple[dict[str, Any], Printer]:
+        roots = app.roots()
+        session, source = resolve_session(session_id, app, roots=roots)
+        # `--check` is the only mode; accepting it makes the documented invocation
+        # work, and the status line reports where the mode came from rather than
+        # pretending the flag changed something.
+        emit_status(
+            [f_session(session, source), sourced("mode", "check", "cli" if check else "default")]
+        )
+        return chronicle_mod.run(roots=roots, session_id=session), _print_lines
+
+    execute(app, "chronicle", body)
 
 
 @cli.command("grep", short_help="Exact speaker/time/regex slicing over rendered transcripts.")
@@ -967,7 +1065,6 @@ def cmd_prune(
                 roots=roots,
                 config=config,
                 session_id=session,
-                project_root=app.project_root,
                 dry_run=dry_run,
                 force=force,
             ),

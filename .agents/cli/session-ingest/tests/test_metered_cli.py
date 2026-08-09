@@ -78,7 +78,12 @@ def test_record_runs_keyless_end_to_end(runner: CliRunner, workspace: Workspace)
     assert payload["status"] == "ok"
     assert payload["schema"] == "ttrpg.session-record/1"
     assert payload["counts"]["events"] == 2
-    assert [step["id"] for step in payload["next_steps"]] == ["ingest_chronicle", "prune"]
+    assert [step["id"] for step in payload["next_steps"]] == [
+        "view",
+        "view_owner_queue",
+        "ingest_chronicle",
+        "chronicle_check",
+    ]
 
     record = json.loads(workspace.roots.session(SESSION_ID).record_json.read_text("utf-8"))
     # Without `segment` nothing can know the table-talk share, so the record says so

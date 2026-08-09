@@ -55,7 +55,6 @@ def _prune(workspace: Workspace, **kwargs):
         roots=workspace.roots,
         config=workspace.config(),
         session_id=SESSION_ID,
-        project_root=workspace.project_root,
         **kwargs,
     )
 
@@ -98,7 +97,6 @@ def test_a_scratch_dataset_is_refused_as_plain_deletable(workspace: Workspace) -
     run_adopt(
         target=str(scratch_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=workspace.config(),
         run=2,
         promote=True,

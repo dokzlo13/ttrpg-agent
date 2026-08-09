@@ -57,7 +57,7 @@ source ./.agents/env.sh
 For reference, that produces:
 
 ```text
-vault/notes{,/images,/mechanics,/readalouds}
+vault/notes{,/images,/mechanics,/readalouds,/sessions,/state,/inbox,/npcs,/locations,/factions}
 vault/library/books
 vault/transcripts     # rendered session transcripts + the two _*.yaml files
 imports/books  imports/source-vault  imports/fvtt-data
@@ -84,7 +84,7 @@ When the user has not chosen a precise scope, offer these options:
 |---|---|---|
 | `search-index` | `.cache/xdg/qmd/index.sqlite*` — the **files only** | Keeps `.cache/index/index.yml` (collection config) and every model store. Rebuild with `.agents/bin/qmd update`; run `.agents/bin/qmd embed` only if semantic search is needed. |
 | `all-index-caches` | `.cache/xdg/qmd/index.sqlite*` **plus** `.cache/index/index.yml` | Removes rebuildable qmd index *and* collection config. `env.sh` re-registers the collections on the next `.agents/bin/qmd` call. Must preserve every model store. Does **not** touch `.agents/`, `.pi/`, or `.claude/`. |
-| `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. |
+| `active-notes` | Markdown/content under `vault/notes/` or a selected subfolder/file | Keeps `vault/`, `vault/notes/`, `vault/.obsidian/`. **`vault/notes/sessions/` is the append-only record of play that happened** — a chronicle is not regenerable from anything once its transcript is pruned. Name it explicitly or it is not in scope. |
 | `ingested-books` | Generated book folders under `vault/library/books/`, either all or selected slugs | Keeps `vault/library/books/` directory. Does not delete source PDFs in `imports/books/`. |
 | `book-ingest-backups` | Stale `.<slug>.<timestamp>.bak` directories and `.<slug>.<timestamp>.bak.md` overview backups under `vault/library/books/` | Keeps current ingested content. These appear when book-ingest runs with `--keep-backup`. |
 | `vault-content` | Active vault content: `vault/notes/`, `vault/library/books/`, and generated data folders such as `vault/images/` if present | Keeps `vault/`, `vault/.obsidian/`, `vault/notes/`, `vault/library/books/`, and **`vault/transcripts/`** — rendered transcripts are session-corpus output with their own scope, not general vault content. Ask before deleting any unusual top-level vault folder. |
@@ -305,7 +305,7 @@ stamp=$(date +%Y%m%d-%H%M%S)
 manifest="/tmp/ttrpg-agent-cleanup-${stamp}-active-notes.txt"
 find vault/notes -mindepth 1 -print 2>/dev/null | sort > "$manifest" || true
 find vault/notes -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-mkdir -p vault/notes vault/notes/images vault/notes/mechanics vault/notes/readalouds
+mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,inbox,npcs,locations,factions}
 printf 'Manifest: %s\n' "$manifest"
 ```
 
@@ -409,7 +409,7 @@ for dir in vault/notes vault/library/books vault/images; do
     find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   fi
 done
-mkdir -p vault/notes vault/notes/images vault/notes/mechanics vault/notes/readalouds vault/library/books
+mkdir -p vault/notes vault/notes/{images,mechanics,readalouds,sessions,state,inbox,npcs,locations,factions} vault/library/books
 printf 'Manifest: %s\n' "$manifest"
 ```
 

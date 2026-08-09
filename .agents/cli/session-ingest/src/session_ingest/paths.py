@@ -1,11 +1,12 @@
 """Where everything lives — resolved from the environment contract, never guessed.
 
-The three roots come from ``.agents/env.sh``:
+The four roots come from ``.agents/env.sh``:
 
 ======================================  =====================================
 ``TTRPG_SESSIONS_DIR``                  ``.cache/sessions``
 ``TTRPG_SESSION_DATASETS_DIR``          ``.cache/sessions/datasets`` (== ``CRAIG_STT_WORK_DIR``)
 ``TTRPG_TRANSCRIPTS_DIR``               ``vault/transcripts``
+``TTRPG_NOTES_DIR``                     ``vault/notes`` (layer 2; read-only to this CLI)
 ======================================  =====================================
 
 An unset root is a hard failure with the launcher named, not a fallback: a
@@ -59,11 +60,12 @@ def _required_root(env: dict[str, str], key: str) -> Path:
 
 @dataclass(frozen=True, slots=True)
 class Roots:
-    """The three contract roots plus the paths derived directly from them."""
+    """The four contract roots plus the paths derived directly from them."""
 
     sessions: Path
     datasets: Path
     transcripts: Path
+    notes: Path
 
     @property
     def scratch(self) -> Path:
@@ -77,6 +79,28 @@ class Roots:
     @property
     def lexicon_file(self) -> Path:
         return self.transcripts / "_lexicon.yaml"
+
+    # -- layer 2 (the tracker). The CLI only ever *reads* these; the agent writes.
+
+    @property
+    def chronicles_dir(self) -> Path:
+        """``vault/notes/sessions/`` — the append-only session chronicle."""
+        return self.notes / "sessions"
+
+    @property
+    def state_dir(self) -> Path:
+        """``vault/notes/state/`` — regenerated projections."""
+        return self.notes / "state"
+
+    @property
+    def inbox_dir(self) -> Path:
+        """``vault/notes/inbox/`` — pending owner proposals; empty means caught up."""
+        return self.notes / "inbox"
+
+    @property
+    def entity_registry_file(self) -> Path:
+        """The canonical-name table that maps ``record.json`` names onto slugs."""
+        return self.state_dir / "entity-registry.md"
 
     def session(self, session_id: str) -> SessionTree:
         parse_session_id(session_id)
@@ -100,17 +124,19 @@ class Roots:
             "sessions": str(self.sessions),
             "datasets": str(self.datasets),
             "transcripts": str(self.transcripts),
+            "notes": str(self.notes),
             "scratch": str(self.scratch),
         }
 
 
 def resolve_roots(env: dict[str, str] | None = None) -> Roots:
-    """Read the three roots out of the environment; fail loudly when unsourced."""
+    """Read the four roots out of the environment; fail loudly when unsourced."""
     resolved = dict(os.environ) if env is None else env
     return Roots(
         sessions=_required_root(resolved, "TTRPG_SESSIONS_DIR"),
         datasets=_required_root(resolved, "TTRPG_SESSION_DATASETS_DIR"),
         transcripts=_required_root(resolved, "TTRPG_TRANSCRIPTS_DIR"),
+        notes=_required_root(resolved, "TTRPG_NOTES_DIR"),
     )
 
 
@@ -225,17 +251,41 @@ class SessionTree:
         """The ``transcript_root`` string recorded in ``record.json``."""
         return f"vault/transcripts/{self.id}"
 
-    def chronicle_candidates(self, project_root: Path) -> list[Path]:
+    def chronicle_candidates(self) -> list[Path]:
         """Chronicle notes in ``vault/notes/sessions/`` that mention this session id.
 
         ``adopt --promote`` refuses when one exists: a re-transcription renumbers
         every segment and turn ID, so approved evidence links would silently
-        start pointing at the wrong words.
+        start pointing at the wrong words. ``prune`` refuses for the mirror-image
+        reason — the audio is regenerable only while the recording still exists.
+
+        The directory comes from ``TTRPG_NOTES_DIR`` (the environment contract),
+        not from the cwd: a chronicle the tool failed to find would read as "no
+        chronicle written", which is the answer that deletes things.
+
+        A same-day suffix makes the plain substring match ambiguous: the id
+        ``2026-08-08`` occurs inside a filename for ``2026-08-08-b`` too. Left
+        alone that lets a sibling session's chronicle unblock ``prune`` for a
+        session nobody wrote up. So any candidate that also carries a *longer,
+        actually adopted* session id is dropped — an exact check against real
+        sessions on disk, never a guess about which slug is a suffix.
         """
-        sessions_dir = project_root / "vault" / "notes" / "sessions"
-        if not sessions_dir.is_dir():
+        chronicles = self.roots.chronicles_dir
+        if not chronicles.is_dir():
             return []
-        return sorted(p for p in sessions_dir.glob(f"*{self.id}*.md") if p.is_file())
+        siblings = [
+            other
+            for other in self.roots.known_session_ids()
+            if other != self.id and other.startswith(f"{self.id}-")
+        ]
+        found = []
+        for path in sorted(chronicles.glob(f"*{self.id}*.md")):
+            if not path.is_file():
+                continue
+            if any(sibling in path.name for sibling in siblings):
+                continue
+            found.append(path)
+        return found
 
     def to_dict(self) -> dict[str, str]:
         return {

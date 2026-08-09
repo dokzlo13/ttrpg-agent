@@ -241,6 +241,12 @@ mkdir -p \
   "$TTRPG_NOTES_DIR/images" \
   "$PROJECT_ROOT/vault/notes/mechanics" \
   "$PROJECT_ROOT/vault/notes/readalouds" \
+  "$TTRPG_NOTES_DIR/sessions" \
+  "$TTRPG_NOTES_DIR/state" \
+  "$TTRPG_NOTES_DIR/inbox" \
+  "$TTRPG_NOTES_DIR/npcs" \
+  "$TTRPG_NOTES_DIR/locations" \
+  "$TTRPG_NOTES_DIR/factions" \
   "$TTRPG_TRANSCRIPTS_DIR" \
   "$TTRPG_LIBRARY_DIR" \
   2>/dev/null

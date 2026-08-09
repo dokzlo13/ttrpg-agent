@@ -42,6 +42,7 @@ from .models import (
 from .nextsteps import CLI, next_steps_for, step
 from .paths import Roots, SessionTree
 from .provenance import CompositeKey, Provenance, sha256_file, utc_now
+from .registry import load_entity_registry
 from .segment import load_classifications
 from .vaultfiles import Lexicon, Speakers, load_lexicon, load_speakers
 from .writer import read_json, write_json
@@ -351,6 +352,7 @@ def composite_key(
     anchors_digest: str | None,
     qa_digest: str | None,
     class_digest: str | None,
+    registry_digest: str | None,
     prompt_version: str,
 ) -> CompositeKey:
     return CompositeKey(
@@ -363,6 +365,10 @@ def composite_key(
             "anchors_digest": anchors_digest,
             "qa_digest": qa_digest,
             "class_digest": class_digest,
+            # Adding an alias to the registry must re-resolve `vault_note`, so the
+            # registry's digest belongs in the key. Without it, fixing a name in
+            # the vault would leave record.json pointing at the old nulls.
+            "registry_digest": registry_digest,
         },
     )
 
@@ -410,6 +416,7 @@ def run(
     lexicon = load_lexicon(roots.lexicon_file)
     speakers = load_speakers(roots.speakers_file)
     classes = load_classifications(tree.turns_class_jsonl)
+    registry = load_entity_registry(roots.entity_registry_file)
 
     prompt_version = str((extraction or {}).get("prompt_version") or PROMPT_VERSION)
     key = composite_key(
@@ -420,6 +427,7 @@ def run(
         anchors_digest=anchors.digest,
         qa_digest=_digest_or_none(tree.qa_json),
         class_digest=_digest_or_none(tree.turns_class_jsonl),
+        registry_digest=registry.digest,
         prompt_version=prompt_version,
     )
     provenance = Provenance.load(tree.provenance_json)
@@ -427,12 +435,29 @@ def run(
     if provenance.should_skip("record", key, force=force, root=tree.root):
         existing = read_json(tree.record_json) if tree.record_json.is_file() else {}
         counts = {family: len(existing.get(family) or []) for family in COLLECTIONS}
+        existing_entities = existing.get("entities") or []
         return {
             "status": "skipped",
             "session": session_id,
             "run": effective_run,
             "path": str(tree.record_json),
+            "schema": existing.get("schema"),
             "counts": counts,
+            # Same keys as the `ok` payload: a consumer that reads `registry`
+            # must not KeyError just because the cache key matched.
+            "registry": {
+                **registry.to_dict(),
+                "resolved_entities": sum(
+                    1
+                    for row in existing_entities
+                    if isinstance(row, Mapping) and row.get("registry_slug")
+                ),
+                "unresolved_entities": registry.unresolved(
+                    str(row.get("canonical") or "")
+                    for row in existing_entities
+                    if isinstance(row, Mapping) and not row.get("registry_slug")
+                ),
+            },
             "warnings": ["record already assembled for this key; use --force to re-run"],
             "next_steps": next_steps_for(
                 "record",
@@ -535,12 +560,23 @@ def run(
         term_id = (
             lexicon_ids.get(canonical.strip().casefold()) if isinstance(canonical, str) else None
         )
+        # The registry is the only thing allowed to turn a heard name into a vault
+        # address. It matches exactly or not at all; an unresolved name keeps its
+        # nulls and surfaces in `registry.unresolved` for the owner to decide.
+        #
+        # `canonical` ONLY. There used to be a second attempt against
+        # `name_as_heard`, which widened the blast radius of a generic alias — a
+        # bare «девочка» heard in some later scene would bind that row to
+        # whichever girl the registry happened to list. Measured against the real
+        # 87-entity session it resolved exactly zero additional rows once
+        # composite matching existed, so it was pure risk.
+        entry = registry.resolve(canonical if isinstance(canonical, str) else None)
         record["entities"].append(
             {
                 **_copy(row, ("id", "kind", "name_as_heard", "canonical", "first_mention_t")),
                 "lexicon_term_id": term_id,
-                # M1: resolving a canonical name to a vault note is the tracker's job.
-                "vault_note": None,
+                "registry_slug": entry.slug if entry is not None else None,
+                "vault_note": entry.note if entry is not None else None,
                 "confidence": row.get("confidence"),
                 "evidence": evidence_of(row, "entities", row.get("id")),
             }
@@ -607,6 +643,27 @@ def run(
         for row in record["events"]
         if row.get("world_impact") != "none" or row.get("needs_owner")
     ]
+    # Report what actually failed to resolve, which is not the same as "canonical
+    # is not in the registry": a row whose canonical missed can still land through
+    # the `name_as_heard` fallback, and listing it as unresolved would send the
+    # owner to add an alias that changes nothing.
+    unknown_entities = registry.unresolved(
+        str(row.get("canonical") or "")
+        for row in record["entities"]
+        if not row.get("registry_slug")
+    )
+    if unknown_entities and registry.present:
+        warnings.append(
+            f"{len(unknown_entities)} entity name(s) are not in the entity registry, so they "
+            f"carry no slug and no vault note. Add the real ones to "
+            f"{roots.entity_registry_file.name} and re-run with --force; leave transcription "
+            f"noise out of it."
+        )
+    if not registry.present:
+        warnings.append(
+            f"no entity registry at {roots.entity_registry_file} — every entity is unresolved. "
+            f"The chronicle's wikilinks will all be candidates rather than confirmed slugs."
+        )
     return {
         "status": "ok",
         "session": session_id,
@@ -619,6 +676,11 @@ def run(
         ),
         "unresolved_evidence": unresolved[:20],
         "needs_owner": len(owner_questions),
+        "registry": {
+            **registry.to_dict(),
+            "resolved_entities": sum(1 for row in record["entities"] if row.get("registry_slug")),
+            "unresolved_entities": unknown_entities,
+        },
         "play_time_s": play.play_time_s,
         "table_talk_share": play.table_talk_share,
         "missing": missing,

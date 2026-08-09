@@ -115,7 +115,6 @@ def run(
     roots: Roots,
     config: SessionConfig,
     session_id: str,
-    project_root: Path | None = None,
     dry_run: bool = False,
     force: bool = False,
 ) -> dict[str, Any]:
@@ -133,7 +132,7 @@ def run(
             detail={"dataset_path": str(dataset_dir), "scratch_root": str(roots.scratch)},
         )
 
-    chronicles = tree.chronicle_candidates(project_root) if project_root is not None else []
+    chronicles = tree.chronicle_candidates()
     warnings: list[str] = []
     if not chronicles:
         # The gate stops *deletion*, not inspection: a dry run removes nothing, and

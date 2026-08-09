@@ -324,7 +324,6 @@ def run_adopt(
     *,
     target: str,
     roots: Roots,
-    project_root: Path,
     config: SessionConfig,
     session_id: str | None = None,
     run: int | None = None,
@@ -535,7 +534,7 @@ def run_adopt(
     if not link.recordings:
         target_active_run = effective_run
     if promote:
-        chronicles = tree.chronicle_candidates(project_root)
+        chronicles = tree.chronicle_candidates()
         if chronicles and not force_relink:
             listed = ", ".join(str(p) for p in chronicles)
             raise DatasetAdoptError(

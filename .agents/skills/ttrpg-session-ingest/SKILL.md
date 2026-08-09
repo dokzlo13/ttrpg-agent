@@ -21,13 +21,20 @@ Two layers, one handoff:
 ```text
 LAYER 1 — the pipeline (this skill)
   share URL ─► craig-stt ─► dataset ─► session-ingest ─► transcript + recap.draft.md + record.json
-LAYER 2 — the campaign note (ttrpg-vault-authoring)
-  record.json + recap.draft.md ─► AGENT ─► session note under vault/notes/
+LAYER 2 — the campaign tracker (ttrpg-session-chronicle)
+  record.json + recap.draft.md ─► AGENT ─► chronicle + inbox + state/ projections
 ```
 
 `record.json` is the **only** thing layer 2 reads from layer 1. The verbatim
 transcript stays available for quoting, but the session note is built from the
 distilled record, never from bulk transcript.
+
+**Read it through `view`, not directly.** `record.json` is ~280 KB for a 3-hour
+session and roughly 60 % of that is the same evidence block repeated under every
+element. `session-ingest view` renders the same content as compact Markdown.
+The rendered view is roughly **3× smaller**; paging the raw JSON into context is
+never the right move. Note that `view --json` returns the structured rows, not
+the prose — reach for the default text output when the goal is reading.
 
 ## When to use
 
@@ -38,8 +45,9 @@ distilled record, never from bulk transcript.
   voice attributed to someone else.
 - "What did X actually say about Y?" — see [Fact-checking](#fact-checking-what-was-said).
 
-**Don't use this for:** writing the durable session note (that's
-`ttrpg-vault-authoring`), campaign/arc design (`ttrpg-campaign-design`), or
+**Don't use this for:** writing the durable session record — that is
+`ttrpg-session-chronicle`, which owns the chronicle, the proposals inbox and the
+`state/` projections. Nor for campaign/arc design (`ttrpg-campaign-design`) or
 prose lookup in books and prep notes (`ttrpg-library-search`).
 
 ## The chain
@@ -50,7 +58,7 @@ plan → craig-stt transcribe --json (GPU ~10 min) → adopt → qa
   │                                                                         └─ record
   └─ thresholds crossed → glossary → plan --run 2 → craig-stt (scratch dir, LOCAL zip,
        no re-download) → adopt --run 2 → qa --run 2 --compare 1 → adopt --promote → render …
-then: the AGENT reads recap.draft.md + record.json and authors the session note
+then: view → the AGENT authors the chronicle (ttrpg-session-chronicle) → chronicle --check → prune
 ```
 
 **`--json` `next_steps` is the ordering authority**, exactly as with
@@ -92,6 +100,8 @@ or will refuse, when a skipped track carries no category at all.
 
 | Verb | Kind | Purpose |
 |---|---|---|
+| `view` | det. | **The read path into `record.json`.** Compact Markdown, one line per element, one evidence link each; `--needs-owner --scene --kind --section --links` |
+| `chronicle --check` | det. | Verify the agent-authored session note: every citation resolves through `anchors.json`, frontmatter is complete. Never writes |
 | `doctor` | det. | Roots, disk by class, SDK vs dataset versions, craig-stt presence, key presence, qmd collection state |
 | `lexicon` | det. | List the loaded lexicon terms; `--expand` also prints every generated case form and skip reason. Read-only |
 | `plan` | det. (`--rank` metered) | Build the biasing files from `_lexicon.yaml`; emit the exact `craig-stt transcribe … --json` command. The biasing flags reach that command only under `--with-biasing` |
@@ -211,8 +221,11 @@ These are the ways this pipeline gets damaged. None is stylistic.
   are `_speakers.yaml` and `_lexicon.yaml`, which are hand-maintained user data
   and the only non-regenerable files in the whole system.
 - **The CLI never writes `vault/notes/`.** The agent is the only writer of
-  campaign notes, via `ttrpg-vault-authoring`, from `recap.draft.md` +
-  `record.json`.
+  campaign notes, via `ttrpg-session-chronicle`, from `record.json` (read through
+  `view`) + `recap.draft.md`. `chronicle --check` verifies what the agent wrote;
+  it does not author or repair it.
+- **Never page `record.json` into context.** Use `view` — its text output is
+  ~3× smaller, because ~60 % of the record is duplicated evidence blocks.
 - **A transcript quote is evidence of what was SAID, not of what is TRUE.**
   Players misremember, joke, and speak out of character; `segment` marks table
   talk but does not adjudicate truth. Present quotes as speech with a timestamp.

@@ -258,6 +258,7 @@ def next_steps_for(
     scratch_dir: str = "$TTRPG_SESSIONS_DIR/scratch/<session-id>-run<N>",
     archive: str = ARCHIVE_PLACEHOLDER,
     dataset_hint: str = "<dataset|recording-id>",
+    clean: bool = False,
 ) -> list[dict[str, Any]]:
     """Ordered steps to run after ``verb`` succeeded."""
     session = _session_flag(session_id)
@@ -349,19 +350,78 @@ def next_steps_for(
     if verb == "record":
         return [
             step(
+                "view",
+                (
+                    "Read the record compactly — one line per element, one evidence link each. "
+                    "Do NOT page record.json itself into context: the rendered view is ~3x "
+                    "smaller, because ~60% of the record is the same evidence blocks repeated."
+                ),
+                command=f"{CLI} view{session}",
+            ),
+            step(
+                "view_owner_queue",
+                (
+                    "List only what the owner must decide: events flagged needs_owner or "
+                    "world_impact != none."
+                ),
+                command=f"{CLI} view{session} --needs-owner",
+            ),
+            step(
                 "ingest_chronicle",
                 (
-                    "Agent step: read recap.draft.md and record.json, then draft the session "
-                    "chronicle and the proposals inbox. The CLI has no write path into vault/notes/."
+                    "Agent step: draft the session chronicle under vault/notes/sessions/ and the "
+                    "proposals inbox, following the ttrpg-session-chronicle skill. The CLI has no "
+                    "write path into vault/notes/ — the agent is the only writer."
                 ),
                 required=False,
             ),
             step(
-                "prune",
-                "After the chronicle is approved, reclaim the regenerable pcm/stt roles.",
-                command=f"{CLI} prune{session} --dry-run",
+                "chronicle_check",
+                "Verify the authored chronicle: every citation resolves, frontmatter is complete.",
+                command=f"{CLI} chronicle{session} --check",
                 required=False,
             ),
+        ]
+
+    if verb == "view":
+        return [
+            step(
+                "ingest_chronicle",
+                (
+                    "Agent step: draft the chronicle and the inbox from what you just read. "
+                    "Reconcile against existing canon before writing — a DM recap of earlier "
+                    "play looks exactly like this session's events in the record."
+                ),
+                required=False,
+            )
+        ]
+
+    if verb == "chronicle":
+        if not clean:
+            return [
+                step(
+                    "fix_chronicle",
+                    (
+                        "Agent step: repair the reported links and frontmatter in the note, then "
+                        "re-check. A citation that does not resolve renders as plain text in "
+                        "Obsidian and is found at the table, not here."
+                    ),
+                    required=False,
+                ),
+                step(
+                    "recheck",
+                    "Re-run the check once the note is repaired.",
+                    command=f"{CLI} chronicle{session} --check",
+                    required=False,
+                ),
+            ]
+        return [
+            step(
+                "prune",
+                "The chronicle gate is satisfied. Inventory the reclaimable audio first.",
+                command=f"{CLI} prune{session} --dry-run",
+                required=False,
+            )
         ]
 
     if verb == "glossary":

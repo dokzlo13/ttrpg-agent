@@ -44,7 +44,7 @@ def test_doctor_json_envelope(runner: CliRunner, workspace: Workspace) -> None:
     assert payload["sdk"]["package"] == "craig-stt-dataset"
     assert payload["llm"]["openai_api_key_present"] is False
     assert payload["datasets"][0]["recording_id"] == RECORDING_ID
-    assert set(payload["roots"]) == {"sessions", "datasets", "transcripts", "scratch"}
+    assert set(payload["roots"]) == {"sessions", "datasets", "transcripts", "notes", "scratch"}
     assert "session_derived_bytes" in payload["disk"]
 
 

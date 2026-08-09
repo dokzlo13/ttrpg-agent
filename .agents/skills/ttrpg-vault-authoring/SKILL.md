@@ -90,13 +90,24 @@ consistent and values boring.
 
 ```yaml
 ---
-type: npc | location | faction | session | monster | item | spell | rules | readaloud | handout | canvas | meta | draft
-source: agent | user | imports/source-vault/<path> | imports/books/<file>.pdf | vault/library/books/<book>/<chapter>.md
+type: npc | location | faction | session | prep | monster | item | spell | rules | readaloud | handout | canvas | meta | draft
+source: agent | user | pipeline | imports/source-vault/<path> | imports/books/<file>.pdf | vault/library/books/<book>/<chapter>.md
 created: YYYY-MM-DD
 tags: [campaign]
 status: draft | reviewed | canon
 ---
 ```
+
+> [!important] `type: session` is reserved for play records
+> A `type: session` note is a **chronicle of a session that was actually
+> played**, written by `ttrpg-session-chronicle` into `vault/notes/sessions/`.
+> Material written *before* play — quest designs, encounter plans, scene
+> outlines — is `type: prep`, and carries
+> `play_status: unplayed | partial | played | superseded | dropped` plus
+> `played_in: [[sNNN-…]]`. Both of those fields are **machine-asserted by
+> session ingestion**: do not hand-maintain them, and do not rewrite prep prose
+> to match what actually happened at the table. Divergence between plan and play
+> is recorded in the session record, never by editing the plan.
 
 Tag policy:
 
@@ -185,7 +196,10 @@ These are hints, not laws. Prefer an existing better local folder when one exist
 | NPC | `vault/notes/npcs/<slug>.md` |
 | location | `vault/notes/locations/<slug>.md` |
 | faction | `vault/notes/factions/<slug>.md` |
-| session prep/recap | `vault/notes/sessions/<slug>.md` |
+| **record of a played session** | `vault/notes/sessions/sNNN-YYYY-MM-DD-<slug>.md` — **via `ttrpg-session-chronicle`**, not by hand. The filename must contain the session id; `prune` and `adopt --promote` glob for it |
+| **prep for a future session** | arc folder under `vault/notes/campaign/arcs/<arc>/`, `type: prep` — never `sessions/` |
+| owner proposals awaiting review | `vault/notes/inbox/sNNN-proposals.md` (`ttrpg-session-chronicle`) |
+| derived state projection | `vault/notes/state/` — regenerated; `story-state.md` is agent-owned outright |
 | monster/item/spell/rule | `vault/notes/mechanics/<kind>/<slug>.md` |
 | read-aloud | `vault/notes/readalouds/<slug>.md` |
 | handout | `vault/notes/handouts/<slug>.md` |

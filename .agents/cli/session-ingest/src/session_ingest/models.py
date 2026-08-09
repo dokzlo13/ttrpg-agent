@@ -504,6 +504,9 @@ class EntityDict(TypedDict):
     canonical: str
     lexicon_term_id: NotRequired[str | None]
     first_mention_t: float
+    #: Slug from ``state/entity-registry.md``; ``None`` when the name matched nothing.
+    registry_slug: NotRequired[str | None]
+    #: Vault path the slug points at, once the entity has been promoted to its own note.
     vault_note: NotRequired[str | None]
     evidence: list[EvidenceDict]
 

@@ -54,7 +54,6 @@ def _prepare(workspace: Workspace, *, lexicon: bool = True, speakers: bool = Tru
     run_adopt(
         target=str(workspace.dataset_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=resolve_config(env={}),
         allow_skipped_tracks=True,
     )
@@ -333,7 +332,6 @@ def test_compare_is_run_level_and_refuses_segment_level(workspace: Workspace) ->
     run_adopt(
         target=str(rerun_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=config,
         run=2,
         allow_skipped_tracks=True,
@@ -543,7 +541,6 @@ def test_the_echo_block_reaches_the_live_compare_payload(workspace: Workspace) -
     run_adopt(
         target=str(rerun_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=config,
         run=2,
         allow_skipped_tracks=True,

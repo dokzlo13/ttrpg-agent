@@ -20,6 +20,10 @@ replace `ttrpg-vault-authoring` for deciding where new durable notes belong.
 | Path | Read? | Write? | Notes |
 |---|---:|---:|---|
 | `vault/notes/` | yes | yes | Active authored campaign notes, prep, canvases, images. Use `ttrpg-vault-authoring` before durable writes. |
+| `vault/notes/sessions/` | yes | via `ttrpg-session-chronicle` | Append-only chronicle of **played** sessions, `sNNN-YYYY-MM-DD-<slug>.md`. Frozen once `status: canon` — corrections are retcon events, not edits. `prune` and `adopt --promote` both glob this directory for the session id. |
+| `vault/notes/state/` | yes | agent-regenerated | Derived projections: `current-state.md`, `story-state.md`, `clocks.md`, `calendar.md`, `entity-registry.md`. `story-state.md` is agent-owned outright; hand edits there are overwritten. |
+| `vault/notes/inbox/` | yes | via `ttrpg-session-chronicle` | Per-session proposals awaiting the owner. Empty means caught up. |
+| `vault/notes/npcs\|locations\|factions/` | yes | yes | Entities promoted out of the roster; every fact bullet cites a session block. |
 | `vault/library/books/` | yes | only via `book-ingest` | Ingested book/reference artifacts. Don't hand-edit chapters. |
 | `vault/transcripts/` | via qmd/grep | only via `session-ingest render` | Rendered session transcripts. Machine-generated and regenerable; never `cat`/Read a chunk. The two `_*.yaml` files are the hand-maintained exception. |
 | `.cache/sessions/` | no | tooling only | Transcription corpus: `datasets/` is craig-stt's (SDK-only, holds the irreplaceable source recording), `<session-id>/` holds session-ingest's derived artifacts. Never open these files directly. |
@@ -94,7 +98,17 @@ vault/transcripts/                # small, Obsidian-visible, qmd-indexed
 ├── datasets/<recording_id>/      # craig-stt's; source/ is IRREPLACEABLE, SDK-only access
 ├── scratch/                      # A/B re-transcription work dirs (disposable)
 └── <session-id>/                 # derived: anchors.json, extraction.json, record.json, recap.draft.md
+
+vault/notes/                      # layer 2 — the campaign tracker (ttrpg-session-chronicle)
+├── sessions/sNNN-YYYY-MM-DD-*.md # append-only play records; block-ID'd fact ledger
+├── inbox/sNNN-proposals.md       # the one file the owner reads after a session
+├── state/                        # regenerated projections + entity-registry.md
+└── npcs/ locations/ factions/    # promoted entities, every fact cited
 ```
+
+`record.json` is the only thing layer 2 reads from layer 1 — and it is read
+through `.agents/bin/session-ingest view`, never opened directly (~280 KB for a
+3-hour session, ~60 % of it duplicated evidence blocks).
 
 Read order and access rules:
 
@@ -144,7 +158,9 @@ absent.
 - New active note/canvas/handout? Use `ttrpg-vault-authoring`, then optionally
   rich-note/canvas skills.
 - New or changed ingested book? Use `ttrpg-import-book-pdf` / `book-ingest`.
-- New session recording, transcript, or recap? Use `ttrpg-session-ingest`; the
-  resulting session note still goes through `ttrpg-vault-authoring`.
+- New session recording or transcript? Use `ttrpg-session-ingest` for the
+  pipeline, then `ttrpg-session-chronicle` for the durable record, inbox and
+  projections. A played-session record is never hand-placed by
+  `ttrpg-vault-authoring`.
 - Promoting old-vault content? Use `ttrpg-import-archive-vault`.
 - Search/index stale? Use `ttrpg-system-qmd-maintenance`.

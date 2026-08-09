@@ -110,6 +110,33 @@ speakers:
 """
 
 
+#: ``vault/notes/state/entity-registry.md`` — prose around one fenced yaml block.
+#: The prose is deliberately present in the fixture: the loader must find the
+#: block inside a real note, not assume the file is bare YAML.
+ENTITY_REGISTRY_MD = """\
+---
+type: meta
+---
+
+# Реестр сущностей
+
+Machine table below; everything else is for the owner.
+
+```yaml
+schema: ttrpg.entity-registry/1
+entities:
+  - {slug: morvika, kind: pc, ru: "Морвика", en: "Morvika", aliases: ["Марвика"],
+     note: null, roster: "party-register", lexicon: null}
+  - {slug: vagzar, kind: npc, ru: "Вазгар", en: null, aliases: ["Вагзар"],
+     note: "npcs/vagzar.md", roster: null, lexicon: vagzar}
+  - {slug: kilverin, kind: location, ru: "Кильверин", en: "Kilverin", aliases: [],
+     note: null, roster: null, lexicon: kilverin}
+```
+
+## Connections
+"""
+
+
 class Expected:
     """Hand-computed metric values for the fixture. Kept beside the fixture on purpose."""
 
@@ -369,7 +396,7 @@ def write_dataset(
 
 @dataclass
 class Workspace:
-    """A throwaway project root with the three contract roots inside it."""
+    """A throwaway project root with the four contract roots inside it."""
 
     project_root: Path
     roots: Roots
@@ -384,6 +411,7 @@ class Workspace:
             "TTRPG_SESSIONS_DIR": str(self.roots.sessions),
             "TTRPG_SESSION_DATASETS_DIR": str(self.roots.datasets),
             "TTRPG_TRANSCRIPTS_DIR": str(self.roots.transcripts),
+            "TTRPG_NOTES_DIR": str(self.roots.notes),
             "TTRPG_SESSION_ID": None,
             "OPENAI_API_KEY": None,
         }
@@ -397,6 +425,7 @@ class Workspace:
             "TTRPG_SESSIONS_DIR": str(self.roots.sessions),
             "TTRPG_SESSION_DATASETS_DIR": str(self.roots.datasets),
             "TTRPG_TRANSCRIPTS_DIR": str(self.roots.transcripts),
+            "TTRPG_NOTES_DIR": str(self.roots.notes),
         }
         base.update(overrides)
         return base
@@ -426,18 +455,23 @@ class Workspace:
         return run_adopt(
             target=str(self.dataset_dir),
             roots=self.roots,
-            project_root=self.project_root,
             config=self.config(),
             allow_skipped_tracks=True,
             **kwargs,
         )
 
     def write_chronicle(self, name: str | None = None) -> Path:
-        path = self.project_root / "vault" / "notes" / "sessions"
+        path = self.roots.chronicles_dir
         path.mkdir(parents=True, exist_ok=True)
         note = path / (name or f"s001-{self.session_id}-test.md")
         note.write_text("# Сессия 1\n", encoding="utf-8")
         return note
+
+    def write_entity_registry(self, text: str = ENTITY_REGISTRY_MD) -> Path:
+        path = self.roots.entity_registry_file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
 
 
 @pytest.fixture
@@ -450,9 +484,11 @@ def workspace(tmp_path: Path) -> Workspace:
         sessions=project_root / ".cache" / "sessions",
         datasets=project_root / ".cache" / "sessions" / "datasets",
         transcripts=project_root / "vault" / "transcripts",
+        notes=project_root / "vault" / "notes",
     )
     roots.datasets.mkdir(parents=True)
     roots.transcripts.mkdir(parents=True)
+    roots.notes.mkdir(parents=True)
 
     dataset_dir = write_dataset(roots.datasets / RECORDING_ID)
     return Workspace(project_root=project_root, roots=roots, dataset_dir=dataset_dir)

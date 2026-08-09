@@ -137,8 +137,24 @@ def test_session_flag_is_threaded_into_every_command() -> None:
 
 def test_record_points_the_agent_at_layer_two() -> None:
     steps = next_steps_for("record", session_id=SESSION)
-    assert [entry["id"] for entry in steps] == ["ingest_chronicle", "prune"]
-    assert "no write path into vault/notes/" in steps[0]["summary"]
+    assert [entry["id"] for entry in steps] == [
+        "view",
+        "view_owner_queue",
+        "ingest_chronicle",
+        "chronicle_check",
+    ]
+    # The compact read comes before the authoring step on purpose: record.json is
+    # ~10x the size of its own digest, and an agent told to "read record.json"
+    # will do exactly that.
+    assert "Do NOT page record.json" in steps[0]["summary"]
+    assert "no write path into vault/notes/" in steps[2]["summary"]
+
+
+def test_chronicle_check_gates_prune_only_when_clean() -> None:
+    dirty = next_steps_for("chronicle", session_id=SESSION, clean=False)
+    assert [entry["id"] for entry in dirty] == ["fix_chronicle", "recheck"]
+    clean = next_steps_for("chronicle", session_id=SESSION, clean=True)
+    assert [entry["id"] for entry in clean] == ["prune"]
 
 
 def test_terminal_verbs_have_no_next_step() -> None:

@@ -355,7 +355,6 @@ def adopt(workspace: Workspace) -> None:
     run_adopt(
         target=str(workspace.dataset_dir),
         roots=workspace.roots,
-        project_root=workspace.project_root,
         config=make_config(api_key=None),
         allow_skipped_tracks=True,
     )
