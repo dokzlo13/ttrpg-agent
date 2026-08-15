@@ -61,10 +61,19 @@ async function resolveUserId() {
 
   const WebSocket = require(path.join(upstreamDir, "node_modules", "ws"));
   const wsProtocol = endpoint.protocol === "https:" ? "wss:" : "ws:";
+  // Foundry v14 resolves the socket's session from the Cookie header
+  // (`server/sessions`: `cookie.parse(e.handshake.headers.cookie)`), not from the
+  // query string. Without it the server emits `42["session",null]`, never binds the
+  // JoinView, and `getJoinData` is never registered — the socket just sits there
+  // streaming `userActivity` until we time out. The query param is retained because
+  // older generations read it from there; sending both works on v13 and v14.
   const socketUrl = `${wsProtocol}//${endpoint.host}/socket.io/?session=${match[1]}&EIO=4&transport=websocket`;
 
   const joinData = await new Promise((resolve, reject) => {
-    const socket = new WebSocket(socketUrl, {rejectUnauthorized: !allowSelfSigned});
+    const socket = new WebSocket(socketUrl, {
+      rejectUnauthorized: !allowSelfSigned,
+      headers: {Cookie: `session=${match[1]}`}
+    });
     const timer = setTimeout(() => {
       socket.terminate();
       reject(new Error("Timed out while requesting Foundry join data"));

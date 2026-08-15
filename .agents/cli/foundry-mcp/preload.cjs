@@ -47,8 +47,44 @@ function rewriteOptions(input) {
   return rewritten;
 }
 
+// Foundry v14 renamed the POST /join body field `userid` -> `userId`
+// (`sessions.authenticateUser`: `const {userId, password} = req.body`). Upstream
+// still sends the lowercase form, so v14 looks up `undefined` and answers
+// 401 JOIN.ErrorUserDoesNotExist. Add the camelCase key while keeping the legacy
+// one, so the payload authenticates on both v13 and v14. Content-Length has to be
+// corrected too, since upstream sized it for the original body.
+function patchJoinPayload(request) {
+  const originalWrite = request.write.bind(request);
+  const originalEnd = request.end.bind(request);
+  let done = false;
+
+  const fix = chunk => {
+    if (done || !chunk || typeof chunk === "function") return chunk;
+    try {
+      const body = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+      const parsed = JSON.parse(body);
+      if (parsed?.action !== "join" || !parsed.userid || parsed.userId !== undefined) return chunk;
+      parsed.userId = parsed.userid;
+      const rewritten = JSON.stringify(parsed);
+      if (!request.headersSent) request.setHeader("Content-Length", Buffer.byteLength(rewritten));
+      done = true;
+      return rewritten;
+    } catch {
+      return chunk;
+    }
+  };
+
+  request.write = (chunk, ...rest) => originalWrite(fix(chunk), ...rest);
+  request.end = (chunk, ...rest) => originalEnd(fix(chunk), ...rest);
+  return request;
+}
+
 https.request = function patchedRequest(input, ...args) {
-  return originalRequest.call(this, rewriteOptions(input), ...args);
+  const options = rewriteOptions(input);
+  const request = originalRequest.call(this, options, ...args);
+  const isJoinPost = options && typeof options === "object" && !(options instanceof URL)
+    && options.path === "/join" && String(options.method).toUpperCase() === "POST";
+  return isJoinPost ? patchJoinPayload(request) : request;
 };
 
 https.get = function patchedGet(input, ...args) {
