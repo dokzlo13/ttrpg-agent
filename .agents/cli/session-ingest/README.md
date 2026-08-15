@@ -101,7 +101,7 @@ All fifteen verbs are implemented. `det.` verbs need no API key and no network;
 | `record` | **det.** | Assemble and schema-validate `record.json`. No second LLM pass — works without a key. Resolves entity names to slugs and vault notes through `state/entity-registry.md` |
 | `view` | det. | **The read path into `record.json`**: compact Markdown, one line per element, one evidence link. `--needs-owner`, `--scene`, `--kind`, `--section`, `--links`, `--min-confidence` |
 | `chronicle` | det. | `--check` the agent-authored session note: every `[[transcripts/…#^t…]]` citation resolved against `anchors.json`, frontmatter completeness, no open `## Вопросы владельцу` on a canon note, freeze-digest integrity. `--freeze` records the canon note's content digest (the append-allowed `## Реконсиляция` excluded) in `.cache/sessions/<id>/chronicle.freeze.json` — the only thing this verb ever writes, and never `vault/notes/`. `--status` sweeps the whole `vault/notes/sessions/` ledger: per-note status, open questions, drift — the mechanical "am I caught up?" |
-| `glossary` | metered | Attach observed variants to canonical terms; append-only `_lexicon.yaml` merge |
+| `glossary` | metered | Attach observed variants to canonical terms; append-only `_lexicon.yaml` merge. Five guardrails gate every proposal — see [Glossary guardrails](#glossary-guardrails) |
 | `prune` | det. | SDK `prune()`; never `rm`; refuses while the chronicle is unwritten |
 
 ### Options
@@ -188,6 +188,57 @@ without parsing prose:
   "next_steps": [{"id": "describe_dataset", "command": ".agents/bin/craig-stt manifest …/xK9mQrTnZp2"}]
 }
 ```
+
+### Glossary guardrails
+
+`render` substitutes lexicon variants **context-free**, so a wrong variant does
+not merely fail to help — it rewrites text that was already correct. Being
+observed in the transcript is therefore necessary but not sufficient. A proposal
+survives only if it clears all five checks; each refusal is reported in
+`variants_rejected` with a reason, and collisions name the other term.
+
+| Check | Refuses | Real example |
+|---|---|---|
+| verbatim | a string the model invented | «Никогда не звучало» |
+| cross-term canonical | a form that is *another* term's canonical/display | «Истрид» proposed for `istrid-loc` → would rewrite every correct nominative into «Истриде» |
+| cross-term variant | a string another term already claims | «Истрит» belongs to `istrid`; one input cannot have two replacements |
+| length floor | anything under `MIN_FORM_LENGTH` (4) | `ЛАС` → would hit «ласково», «класс» |
+| enclosing form | a string that sits inside a longer known form | «Истр» clears the length floor yet turns «Истрид» into «Истридеид» |
+
+The last two are complementary, not redundant: the floor guards against ordinary
+words the lexicon never sees, the enclosing check against the lexicon's own
+forms. A variant that merely *contains* the canonical is fine — «Освальд Стоун»
+→ «Освальд» is a normalisation, not a collision.
+
+A **new** term is written only when at least one variant survives: an entry that
+corrects nothing is bloat in a hand-maintained file. Biasing-only terms (no
+variants) stay the owner's to add by hand.
+
+Unlike `morphs.py`, which raises `LexiconExpansionError` on an ambiguous pair,
+these drop and report — the model proposes speculatively and one bad row must
+not cost the good ones. The regression case is
+`tests/test_glossary.py::test_the_2026_08_15_lexicon_corruption_is_refused`.
+
+#### The direction gate
+
+Structural checks cannot catch a **backwards** proposal — the model naming the
+misrecognition as canonical and the correct spelling as its variant. Two of
+those passed every check above on 2026-08-15: `Барл` recorded as canonical with
+the correct `Баррелла` as its variant, and `дом Вейн` with `Вэйл`.
+
+Direction is a judgement about the campaign, not about strings, so a **new**
+term's canonical must already appear in `state/entity-registry.md` — the file
+the owner curates during the chronicle review. Held-back terms land in
+`unknown_canonicals`; add the entity and re-run. Existing lexicon terms are
+exempt: their canonical was the owner's choice, so their direction is fixed.
+
+With no registry file the gate opens and `run` warns (`entity_registry_present:
+false`), because refusing everything would make `glossary` useless on a vault
+that has not started a registry.
+
+Measured on the real 2026-08-15 batch: 26 proposed new terms → **1 written**
+(`Мардан`→`Марден`), 2 held for the owner, 23 refused as variant-less, and all
+six damaging variants refused.
 
 ### Metered stages
 

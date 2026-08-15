@@ -54,6 +54,9 @@ TERM_TEXT = {
     14: "Реплика 14. Вагзар смотрит.",
     24: "Реплика 24. Вазагар молчит.",
     6: "Реплика 6. Освальд Стоун здесь.",
+    #: A misrecognition no lexicon term claims — the clean "brand-new term"
+    #: case, kept distinct from «Освальд Стоун» so it cannot collide.
+    8: "Реплика 8. Мардан пришёл.",
 }
 
 LEXICON_YAML = """\
