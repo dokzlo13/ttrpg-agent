@@ -52,12 +52,59 @@ or changing the configuration.
   launcher/preload. The upstream pin lives in `.agents/manifest.toml` (`[[vendor]]` foundry-vtt-mcp); `install.sh` carries a matching fallback for direct invocation.
 - Prefer read-only MCP calls for smoke tests. Ask before destructive or broad
   write operations in the live world.
+- **Never leave an MCP session connected to a world that is being played.** It
+  logs in as a real user and is `isGM`; see below.
+
+## The GM-election hazard
+
+A connected MCP session is a headless client that registers **no module code**.
+That matters because of how Foundry and socketlib pick the GM that answers
+relayed work:
+
+```js
+// Foundry core
+get isGM() { return this.hasRole(USER_ROLES.ASSISTANT); }         // role >= 3
+get activeGM() { return this.getDesignatedUser(u => u.active && u.isGM); }
+//   "the active Gamemaster (non-assistant if possible)"
+//   "Returns a User with the highest role among the qualifying Users"
+
+// socketlib, _handleRequest
+case RECIPIENT_TYPES.ONE_GM:
+  if (!game.users.activeGM?.isSelf) return;      // exactly ONE client responds
+```
+
+So every `executeAsGM` call — which is how midi-qol, chris-premades and similar
+automation service player-initiated workflows — is answered by `activeGM` and
+nobody else. If the MCP user wins that election, the call is delivered to a
+client with no handlers registered: the player's promise never resolves and
+never rejects. The symptom is **player item/spell use that hangs silently, with
+no console error**, while the same action works for the GM.
+
+Two mitigations, both required:
+
+1. **Assistant (role 3), not Gamemaster (role 4).** `activeGM` returns the
+   highest role, so a real role-4 Gamemaster always outranks MCP. At role 4 the
+   two tie and the winner is order-dependent.
+2. **Do not leave the session running.** `smoke-test.mjs` reaps its own server
+   (the SDK's `StdioClientTransport.close()` aborts its controller and drops the
+   child reference *without* killing it, so this must be done explicitly). After
+   any manual/ad-hoc run, confirm with:
+
+   ```bash
+   ps aux | grep "[f]oundry-vtt-mcp"      # expect no output
+   pkill -f "foundry-vtt-mcp/build/server.js"
+   ```
 
 ## Initial setup
 
 1. Confirm Foundry is running with the target world active.
-2. Have the user create a dedicated Foundry account. Gamemaster is required for
-   unrestricted MCP writes; lesser roles intentionally restrict capabilities.
+2. Have the user create a dedicated Foundry account and give it **Assistant GM
+   (role 3), not Gamemaster (role 4)** — see [The GM-election
+   hazard](#the-gm-election-hazard) for why. Assistant still satisfies
+   `User#isGM` (which is `hasRole(ASSISTANT)`, not `role === GAMEMASTER`), so
+   MCP keeps GM-level read/write on actors, items, scenes and journals. It
+   cannot change user roles or world-level settings; grant Gamemaster only if a
+   task genuinely needs that, and demote it again afterwards.
 3. Configure the gitignored project `.env`:
 
    ```dotenv
